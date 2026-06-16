@@ -1,0 +1,221 @@
+# Maperati
+
+A local browser app for planning and exporting walking routes on OpenStreetMap. Built with Flask and Leaflet.js.
+
+## Requirements
+
+- Python 3.9+
+- A free [OpenRouteService API key](https://openrouteservice.org) (40 req/min on free tier)
+
+## Setup
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/your-username/maperati.git
+cd maperati
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Add your ORS API key
+echo "ORS_API_KEY=your_key_here" > .env
+
+# 4. Run
+python3 app.py
+```
+
+Opens automatically at `http://localhost:5001`. The `.env` file is gitignored — never commit your API key.
+
+The `+` / `−` zoom buttons step by **0.25** per click for fine-grained control.
+
+---
+
+## Drawing a route
+
+Click **Draw ▾** in the bottom toolbar and choose a mode:
+
+| Mode | Behaviour |
+|------|-----------|
+| **Snap** | Each click snaps to the nearest road node; ORS routes between points |
+| **Free** | Line goes exactly where you click — useful for parks, plazas, alleys |
+
+You can mix modes in the same route. Click **Stop drawing** when done.
+
+**Edit ▾** gives you:
+- **Undo / Redo** — full undo/redo system covering all major actions (drawing, stops, routes, erasures, reversals). Keyboard shortcuts: **Cmd+Z** (undo), **Cmd+Shift+Z** or **Cmd+Y** (redo)
+- **Erase section** — click two points on the route; the section between them is removed and automatically rerouted
+- **Reverse route** — flips the direction of the entire route and stop order; swaps Start/End roles
+- **Clear entire route** — resets the drawn line
+
+Right-click on the map (once a route exists) to **redo the route from that point** (trims the line and resumes drawing; creates an undo snapshot) or clear the route.
+
+Click anywhere on the blue route line to see how far from the start that point is.
+
+---
+
+## Stops & markers
+
+Stops are named points that carry through to all exports. They can be numbered (sequenced along the route) or category markers (descriptive icons for points of interest).
+
+### Adding stops
+- **Click map to add stop** — places a stop at the clicked location; a popup appears with an **Add** button and a **Type** selector
+- **Type row** in the sidebar sets the default type for new stops: Stop (numbered) or one of the 7 category types
+- **Search for a place** — geocodes a name or address and adds it as a stop
+
+### Stop types
+| Type | Marker | Behaviour |
+|------|--------|-----------|
+| Stop (default) | Dark numbered circle | Sequenced; counted in route-to-next chain |
+| Best street | Purple letter icon | Category; ordered by route proximity |
+| Garden | Green icon | Category; ordered by route proximity |
+| Museum | Blue icon | Category; ordered by route proximity |
+| Church | Purple icon | Category; ordered by route proximity |
+| Monument | Brown icon | Category; ordered by route proximity |
+| Cafe/restaurant | Red icon | Category; ordered by route proximity |
+| Market | Teal icon | Category; ordered by route proximity |
+
+Category markers auto-insert between the nearest numbered stops when a route exists. In a mixed list, **Route to next** connects numbered stops only; if the list has only category markers, they are all connected in sequence.
+
+### Managing stops
+- Drag ⠿ to reorder; click ✎ to rename; click × to remove
+- Click a stop's badge/icon in the sidebar to pan the map and open its popup
+- Click ⋯ to set role (Start / End / Start & End loop) or change category
+- Click **Add note** to add a free-text note (exported in all formats)
+- Each stop shows walking distance and time from the previous stop
+- **Route to next** button between consecutive numbered stops — auto-routes via ORS/OSRM
+
+While drawing, clicking a stop marker or an imported POI dot routes the line through that exact location.
+
+---
+
+## Discover
+
+The **Discover** sidebar section searches OpenStreetMap for nearby points of interest:
+
+- Choose a category — **Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market** — to search the current map view
+- Or type a name in the search box
+- Results appear as purple markers; click one to add it as a stop (or as a route point if drawing)
+- Click **Clear** to remove the results
+
+Searches use the public Overpass API with an automatic fallback server, so if one endpoint is slow it retries against a second one transparently.
+
+---
+
+## Elevation profile
+
+Click **Elevation** in the route stats pill (appears once a route is drawn) to open the profile panel.
+
+- Distance grid lines show where elevations occur along the route
+- Hover over the chart to see elevation and distance at any point; a marker moves on the map in sync
+- Click on the chart to pan the map to that position
+- GPX files with embedded `<ele>` tags use those values directly; otherwise elevation is fetched from ORS
+
+---
+
+## Importing
+
+Drag a file onto the Import area or click to browse. Supported formats:
+
+| Format | Route | Stops / waypoints |
+|--------|-------|-------------------|
+| **GPX** | Track / route points drawn as route line | `<wpt>` elements added as stops |
+| **KML** | `<LineString>` drawn as route | `<Placemark>` points added as stops |
+| **GeoJSON** | LineString features drawn as route | Point features added as stops |
+| **CSV** | — | Rows with lat/lng shown as filterable POI dots |
+
+CSV files use Paris open-data format (semicolon-delimited) by default.
+
+---
+
+## Exporting
+
+Click **Export ▾**, enter a file name, and choose:
+
+| Format | Contents |
+|--------|----------|
+| **GeoJSON** | Route line + stops as a FeatureCollection |
+| **GPX** | Route as a track, stops as waypoints |
+| **KML** | Route + stops for Google Earth / Maps |
+| **CSV stops** | Stops table with name, lat, lng |
+| **Text directions** | Turn-by-turn walking directions via ORS (requires API key); consecutive steps on the same street are merged |
+| **Export image (JPG)** | Map image of the export area with route and stop markers drawn on top |
+
+All file exports are client-side — no data is sent anywhere. Text directions require an ORS API key.
+
+### Image export
+
+The JPG export stitches map tiles directly in the browser using the HTML5 Canvas API. To control exactly what area is captured:
+
+1. Open **Export ▾** → click **Set image area** — cursor becomes a crosshair
+2. Click the first corner, then the opposite corner — a dashed blue rectangle appears
+3. Open **Export ▾** → click **Export image (JPG)**
+
+Click **Clear area** to remove the rectangle and redefine. If no area is set, the export uses the route bounds.
+
+**Tile CORS note:** OSM, CartoDB Positron, and ESRI Satellite all support cross-origin canvas access. The OSM Forte EN basemap does not — if it is active when you export, CartoDB Positron is substituted silently.
+
+---
+
+## Session persistence
+
+The current route and stops are auto-saved to browser localStorage (`maperati_session`) after every change. They are restored automatically on page reload. Click **New walk** to clear the session and start fresh.
+
+To make a durable backup or move your work between machines:
+- Click **Export ▾** → **Save session file** to download a `.json` snapshot
+- Drop that file back into the Import area to restore everything exactly as you left it (editable route, named and roled stops, map position)
+
+---
+
+## Basemaps
+
+The picker (top-right of map) switches between:
+
+- **OSM Forte EN** (default) — detailed English-label style from Quai d'Orsay
+- **OpenStreetMap** — standard OSM
+- **CartoDB Positron** — clean minimal light style
+- **CartoDB Voyager** — detailed street map with muted colours
+- **ESRI Satellite** — aerial imagery
+
+---
+
+## Routing
+
+[OpenRouteService](https://openrouteservice.org) (foot-walking profile) is the primary engine for both snapping and segment routing. If ORS fails or no key is set, the app falls back silently to the public [OSRM](http://router.project-osrm.org) server. ORS gives better coverage in central Paris where OSRM has known gaps.
+
+Geocoding uses [Nominatim](https://nominatim.openstreetmap.org).
+
+---
+
+## File structure
+
+```
+maperati/
+  index.html               — HTML structure
+  static/
+    app.css                — all styles
+    state.js               — global state variables and CATEGORIES constant
+    map-init.js            — Leaflet map, tile layers, basemap picker, north arrow
+    icons.js               — marker icon factories and renderStopMarkers
+    drawing.js             — undo/redo, draw modes, erase, route stats
+    elevation.js           — elevation profile chart and fetch
+    routing.js             — segment routing (ORS/OSRM)
+    stops.js               — stop management, geocode, add-stop popup, reorder
+    import.js              — file handling (CSV, GPX, KML, GeoJSON, session)
+    exports.js             — GeoJSON/GPX/KML/CSV/directions/image/print exports
+    discover.js            — Overpass API POI search with fallback endpoint
+    ui.js                  — UI helpers, session persistence, map click dispatch
+    init.js                — wires all event listeners, restores session on load
+    app.js                 — original monolith (kept as fallback)
+  app.py                   — Flask backend: routing proxy, elevation, CSV upload
+  umap_walk_generator.py   — CSV parsing helper
+  requirements.txt
+  .env                     — ORS_API_KEY (gitignored, create locally)
+```
+
+---
+
+## Notes
+
+- Not yet optimised for mobile
+- Tested on macOS with Safari
+- The Discover section uses two Overpass API servers (`overpass-api.de` primary, `overpass.kumi.systems` fallback) with a 12-second timeout per attempt, so searches reliably complete even when one server is slow

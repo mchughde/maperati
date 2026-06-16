@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Maperati</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/static/app.css"/>
+</head>
+<body>
+
+<header>
+  <button class="hbtn-icon" onclick="toggleSidebar()" id="sidebarToggle" title="Toggle sidebar">☰</button>
+  <div class="header-logo">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+  </div>
+  <h1>Maperati</h1>
+  <div class="spacer"></div>
+  <div style="position:relative">
+    <button class="hbtn hbtn-outline" id="exportMenuBtn" onclick="toggleExportDropdown()">Export ▾</button>
+    <div id="exportDropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.13);padding:14px;min-width:220px;z-index:2000">
+      <div style="font-size:0.72rem;font-weight:600;color:#4B4542;margin-bottom:8px">File name</div>
+      <input type="text" id="exportName" placeholder="my_walk" value="my_walk" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1.5px solid #D0E3FF;border-radius:7px;font-size:0.78rem;font-family:inherit;outline:none;margin-bottom:10px"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <button class="btn btn-secondary" onclick="exportAs('geojson')">GeoJSON</button>
+        <button class="btn btn-secondary" onclick="exportAs('gpx')">GPX</button>
+        <button class="btn btn-secondary" onclick="exportAs('kml')">KML</button>
+        <button class="btn btn-secondary" onclick="exportAs('csv')">CSV stops</button>
+      </div>
+      <button class="btn btn-secondary btn-block" onclick="exportAs('directions')" style="margin-bottom:6px">Text directions</button>
+      <button class="btn btn-secondary btn-block" id="printAreaBtn" onclick="togglePrintAreaMode();toggleExportDropdown()" style="margin-bottom:4px">Set image area</button>
+      <button class="btn btn-secondary btn-block" id="clearPrintAreaBtn" onclick="clearPrintArea()" style="display:none;margin-bottom:4px">Clear area</button>
+      <button class="btn btn-secondary btn-block" onclick="exportMapImage();toggleExportDropdown()" style="margin-bottom:6px">Export image (JPG)</button>
+      <div style="height:1px;background:#D0E3FF;margin:6px 0"></div>
+      <button class="btn btn-secondary btn-block" onclick="saveSessionFile()" style="font-size:0.76rem">Save session file</button>
+      <div id="exportMsg" style="margin-top:6px"></div>
+    </div>
+  </div>
+  <button class="hbtn" onclick="newMap()">New walk</button>
+  <button class="hbtn-icon" onclick="toggleFullscreen()" id="fullscreenBtn" title="Full screen">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+  </button>
+  <span id="snapIndicator"></span>
+</header>
+<button id="fullscreenExit" onclick="toggleFullscreen()" title="Exit full screen">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+  Exit full screen
+</button>
+
+<div class="main">
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<div class="sidebar">
+
+  <!-- §1 Import -->
+  <div class="section">
+    <div class="section-header open" onclick="toggleSection(this)">
+      Import
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body open">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        Drop a file here, or click to browse
+        <strong id="fileLabel"></strong>
+        <div style="font-size:0.7rem;color:#aaa;margin-top:4px">CSV · GPX · KML · GeoJSON</div>
+        <input type="file" id="fileInput" accept=".csv,.gpx,.kml,.geojson,.json" onchange="handleFile(this.files[0])"/>
+      </div>
+
+      <div class="form-row" id="delimRow" style="display:none">
+        <label>CSV delimiter</label>
+        <select id="delimiter">
+          <option value=";">Semicolon ; (Paris open data)</option>
+          <option value=",">Comma ,</option>
+          <option value="&#9;">Tab</option>
+        </select>
+      </div>
+
+      <div id="dataInfo" style="display:none">
+        <div class="data-info" id="dataCount"></div>
+        <div class="col-tags" id="colTags"></div>
+      </div>
+
+      <!-- Arrondissement filter (Paris only) -->
+      <div id="arrFilter" class="form-row" style="margin-top:8px">
+        <label>Filter by arrondissement</label>
+        <select id="arrSelect" onchange="applyFilters()">
+          <option value="">All arrondissements</option>
+        </select>
+      </div>
+
+      <!-- Name search -->
+      <div class="form-row" id="searchRow" style="display:none;margin-top:6px">
+        <label>Search by name</label>
+        <input type="search" id="nameSearch" placeholder="Type to filter…" oninput="applyFilters()"/>
+      </div>
+
+      <!-- Draw area filter -->
+      <div id="areaFilterRow" style="display:none;margin-top:4px">
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" id="bboxBtn" onclick="toggleBboxMode()">Filter by area</button>
+          <button class="btn btn-sm btn-danger" id="clearBboxBtn" onclick="clearBbox()" style="display:none">Clear area</button>
+        </div>
+      </div>
+
+      <!-- POI visibility toggle -->
+      <div id="poiToggleRow" style="display:none;margin-top:6px">
+        <button class="btn btn-secondary btn-sm" id="togglePOIBtn" onclick="togglePOIMarkers()">POI markers visible</button>
+      </div>
+
+      <div id="datasetMsg"></div>
+      <div id="filteredCount" style="font-size:0.73rem;color:#888;margin-top:4px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- §2 Add stops -->
+  <div class="section">
+    <div class="section-header open" onclick="toggleSection(this)">
+      Add stops & markers
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body open">
+      <div style="margin-bottom:6px">
+        <div style="font-size:0.65rem;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">Type</div>
+        <div id="addStopModeRow" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+      <div class="btn-row" style="margin-bottom:10px">
+        <button class="btn btn-secondary" id="mapClickBtn" onclick="toggleMapClickMode()">Click map to add stop</button>
+      </div>
+      <div class="form-row">
+        <label>Search for a place</label>
+        <div class="geo-input-wrap">
+          <input type="search" id="geoInput" placeholder="Type a name or address…" oninput="debounceGeo()" autocomplete="off"/>
+          <div class="geo-results" id="geoResults" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §3 Discover (OSM POI search) -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      Discover
+      <span class="toggle">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="form-row">
+        <label>Category</label>
+        <div class="osm-cat-grid">
+          <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=cafe','node',this)">Cafe</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=restaurant','node',this)">Restaurant</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('tourism=museum','way',this)">Museum</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=place_of_worship','way',this)">Church</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('leisure=park','way',this)">Park</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('leisure=garden','way',this)">Garden</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('historic=monument','node',this)">Monument</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=marketplace','node',this)">Market</button>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:8px">
+        <label>Search by name</label>
+        <div style="display:flex;gap:6px">
+          <input type="search" id="osmSearchInput" placeholder="e.g. Musée d'Orsay" style="flex:1"/>
+          <button class="btn btn-primary btn-sm" onclick="searchOsmByName()">Search</button>
+        </div>
+      </div>
+      <div id="osmSearchMsg"></div>
+      <div id="osmResultsInfo" style="display:none;margin-top:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span id="osmResultCount" style="font-size:0.72rem;color:#6878A0"></span>
+          <button class="btn btn-sm btn-danger" onclick="clearOsmResults()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §4 Your stops -->
+  <div class="section" style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <div class="section-header open" onclick="toggleSection(this)">
+      Your stops
+      <span id="stopCountBadge" style="color:#2563EB;font-weight:700;margin-left:4px"></span>
+      <span class="toggle" style="margin-left:auto">▼</span>
+    </div>
+    <div class="section-body open stop-scroll" style="padding:0;flex:1">
+      <div class="empty-state" id="emptyState">No stops yet.<br/>Click the map or search for a place.</div>
+      <div id="stopList"></div>
+      <div class="btn-row" style="padding:8px 16px" id="stopControls" style="display:none">
+        <button class="btn btn-danger btn-sm" onclick="clearStops()" id="clearStopsBtn" style="display:none">Clear all</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- end sidebar -->
+
+<!-- ══════════════ MAP ══════════════ -->
+<div style="flex:1;position:relative;display:flex;flex-direction:column">
+  <div id="map" style="flex:1"></div>
+
+  <!-- Floating draw toolbar — bottom centre -->
+  <div id="drawToolbar">
+    <div style="position:relative">
+      <button class="tb-btn" id="drawBtn" onclick="toggleDrawDropdown()">Draw ▾</button>
+      <div id="drawDropdown">
+        <button class="edit-item" onclick="startDraw('auto')">Snap (follows roads)</button>
+        <button class="edit-item" onclick="startDraw('free')">Free (exact path)</button>
+        <div id="stopDrawDivider" style="display:none;height:1px;background:#D0E3FF;margin:4px 0"></div>
+        <button class="edit-item" id="stopDrawItem" style="display:none" onclick="stopDrawFromMenu()">Stop drawing</button>
+      </div>
+    </div>
+    <div class="tb-divider" id="editDivider" style="display:none"></div>
+    <div style="position:relative">
+      <button class="tb-btn" id="editMenuBtn" onclick="toggleEditDropdown()" style="display:none">Edit ▾</button>
+      <div id="editDropdown">
+        <button class="edit-item" id="undoActionBtn" onclick="undoAction();closeEditDropdown()" style="display:none">Undo</button>
+        <button class="edit-item" id="redoActionBtn" onclick="redoAction();closeEditDropdown()" style="display:none">Redo</button>
+        <button class="edit-item" id="eraseBtn" onclick="toggleEraseMode();closeEditDropdown()">Erase section</button>
+        <button class="edit-item" id="reverseBtn" onclick="reverseRoute();closeEditDropdown()" style="display:none">Reverse route</button>
+        <div style="height:1px;background:#D5E6D9;margin:4px 0"></div>
+        <button class="edit-item danger" onclick="clearRouteAction()">Clear entire route</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right-click context menu -->
+  <div id="ctxMenu" style="display:none;position:absolute;background:white;border:1px solid #ddd;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,0.15);z-index:2000;min-width:160px;font-size:0.82rem">
+    <div id="ctxRedoFrom" style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='#f5f8f5'" onmouseout="this.style.background=''">
+      Redo route from here
+    </div>
+    <div style="padding:8px 14px;cursor:pointer;color:#DC2626" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''" onclick="clearDrawing();hideCtx()">
+      Clear entire route
+    </div>
+  </div>
+
+  <div id="routeStats">
+    <strong id="statsDist"></strong> &nbsp;·&nbsp; <span id="statsTime"></span>
+    <span style="width:1px;height:14px;background:#D0E3FF;display:inline-block;margin:0 8px;vertical-align:middle"></span>
+    <button id="elevBtn" onclick="toggleElevationPanel()" style="background:none;border:none;font-size:0.75rem;font-weight:600;color:#6878A0;cursor:pointer;padding:0;font-family:inherit">Elevation</button>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<div id="elevationPanel"></div>
+
+<div id="toast"></div>
+<!-- state must load first (declares all globals); map-init second (creates map + L.layerGroup refs) -->
+<script src="/static/state.js"></script>
+<script src="/static/map-init.js"></script>
+<!-- icon factories and marker rendering depend on state + map -->
+<script src="/static/icons.js"></script>
+<!-- drawing, undo/redo, erase depend on icons + state -->
+<script src="/static/drawing.js"></script>
+<!-- elevation depends on drawing (cumDists, sampleEvenly used here; also defined in elevation.js) -->
+<script src="/static/elevation.js"></script>
+<!-- routing depends on drawing + stops -->
+<script src="/static/routing.js"></script>
+<!-- stops depends on icons + drawing + routing -->
+<script src="/static/stops.js"></script>
+<!-- import depends on stops + drawing + routing + elevation -->
+<script src="/static/import.js"></script>
+<!-- exports depends on drawing + stops + ui (showToast) -->
+<script src="/static/exports.js"></script>
+<!-- discover depends on state + drawing + stops -->
+<script src="/static/discover.js"></script>
+<!-- ui depends on everything above -->
+<script src="/static/ui.js"></script>
+<!-- init runs last: wires up map events, restoreSession, renderAddStopModeRow -->
+<script src="/static/init.js"></script>
+</body>
+</html>

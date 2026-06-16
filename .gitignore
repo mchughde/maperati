@@ -1,0 +1,46 @@
+# Secret config — never commit this
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Temp files written by the app
+_tmp_*
+_session_*.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files (old versions kept locally)
+*.bak
+*.bak2
+
+# Personal map data — stays local, never upload
+Paris Parks/
+*.geojson
+*.gpx
+*.kml
+*.docx
+
+# Claude Code project memory — local only
+.claude/
+
+# Claude Code project context — local only
+CLAUDE.md
