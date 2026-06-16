@@ -11,7 +11,7 @@ A local browser app for planning and exporting walking routes on OpenStreetMap. 
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-username/maperati.git
+git clone https://github.com/mchughde/maperati.git
 cd maperati
 
 # 2. Install dependencies
@@ -79,10 +79,14 @@ Category markers auto-insert between the nearest numbered stops when a route exi
 ### Managing stops
 - Drag ⠿ to reorder; click ✎ to rename; click × to remove
 - Click a stop's badge/icon in the sidebar to pan the map and open its popup
-- Click ⋯ to set role (Start / End / Start & End loop) or change category
+- Click ⋯ to set role (**Start** / **End** / **Start & End** loop) or change category
 - Click **Add note** to add a free-text note (exported in all formats)
 - Each stop shows walking distance and time from the previous stop
 - **Route to next** button between consecutive numbered stops — auto-routes via ORS/OSRM
+
+### Loop routes
+
+Mark a stop as **Start & End** (via ⋯ → Set as start & end) to designate it as both the beginning and end of a loop route. It shows a split green/red pill marker. If that stop is not the last in your list, a **Route to close loop** button appears after the final stop — click it to automatically route back to the loop point and complete the circuit.
 
 While drawing, clicking a stop marker or an imported POI dot routes the line through that exact location.
 
@@ -201,11 +205,10 @@ maperati/
     routing.js             — segment routing (ORS/OSRM)
     stops.js               — stop management, geocode, add-stop popup, reorder
     import.js              — file handling (CSV, GPX, KML, GeoJSON, session)
-    exports.js             — GeoJSON/GPX/KML/CSV/directions/image/print exports
+    exports.js             — GeoJSON/GPX/KML/CSV/directions/image exports
     discover.js            — Overpass API POI search with fallback endpoint
     ui.js                  — UI helpers, session persistence, map click dispatch
     init.js                — wires all event listeners, restores session on load
-    app.js                 — original monolith (kept as fallback)
   app.py                   — Flask backend: routing proxy, elevation, CSV upload
   umap_walk_generator.py   — CSV parsing helper
   requirements.txt
