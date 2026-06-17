@@ -278,6 +278,7 @@ async function erasePoint(lat, lng) {
     const p1 = from > 0 ? routeCoords[from - 1] : null;
     const p2 = to < routeCoords.length - 1 ? routeCoords[to + 1] : null;
 
+    pruneDetourMarkersInRange(from, to);
     routeCoords.splice(from, to - from + 1);
 
     if (eraseMarker) { map.removeLayer(eraseMarker); eraseMarker = null; }
@@ -304,7 +305,6 @@ async function erasePoint(lat, lng) {
     }
 
     menuBtn.textContent = "Edit ▾";
-    clearDetourMarkers();
     routeDistM = calcDist(routeCoords);
     redrawRoute();
     if (routeCoords.length > 1) updateRouteStats();
@@ -369,6 +369,18 @@ function clearDetourMarkers() {
   detourMarkerList.forEach(m => map.removeLayer(m));
   detourMarkerList = [];
   detourPoints = [];
+}
+
+function pruneDetourMarkersInRange(fromIdx, toIdx) {
+  // Walk backwards so splicing doesn't shift remaining indices
+  for (let i = detourPoints.length - 1; i >= 0; i--) {
+    const nearest = findNearestRouteIndex(detourPoints[i].lat, detourPoints[i].lng);
+    if (nearest >= fromIdx && nearest <= toIdx) {
+      map.removeLayer(detourMarkerList[i]);
+      detourMarkerList.splice(i, 1);
+      detourPoints.splice(i, 1);
+    }
+  }
 }
 
 function addDetourMarker(lat, lng) {
