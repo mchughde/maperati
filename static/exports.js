@@ -124,79 +124,117 @@ async function exportDirections(name) {
     msg.innerHTML = '<div class="msg warn">Add at least 2 stops to export directions.</div>';
     return;
   }
+  if (!routeCoords.length) {
+    msg.innerHTML = '<div class="msg warn">Draw a route first to export directions.</div>';
+    return;
+  }
   msg.innerHTML = '<div class="msg info"><span class="spinner">⟳</span> Fetching street-by-street directions…</div>';
 
   const sep = "─".repeat(52);
   let txt = `WALKING DIRECTIONS: ${name.toUpperCase()}\n${sep}\n\n`;
-
-  let orsSegments = null;
-  try {
-    const stopCoords = selectedStops.map(s => [s.lat, s.lng]);
-    const res = await fetch("/api/directions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stops: stopCoords })
-    });
-    const data = await res.json();
-    if (data.ok && data.segments?.length) {
-      orsSegments = data.segments;
-    }
-  } catch(_) {}
 
   const totalDist = routeDistM || (routeCoords.length > 1 ? calcDist(routeCoords) : 0);
   if (totalDist > 0) {
     txt += `Total distance:  ~${(totalDist / 1000).toFixed(2)} km\n`;
     txt += `Estimated time:  ~${Math.round(totalDist / 83.33)} min at easy walking pace\n\n`;
   }
-
   txt += sep + "\n\n";
 
-  for (let i = 0; i < selectedStops.length; i++) {
-    const s = selectedStops[i];
-    const label = s.role === 'start' ? 'START' : s.role === 'end' ? 'END' : s.role === 'startend' ? 'START / END' : `STOP ${i + 1}`;
-    txt += `${label}  —  ${s.name}\n`;
-    if (s.notes) txt += `  Note: ${s.notes}\n`;
+  let matchSteps = null;
+  try {
+    const res = await fetch("/api/match-directions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coords: routeCoords,
+        stops:  selectedStops.map(s => ({ name: s.name, lat: s.lat, lng: s.lng }))
+      })
+    });
+    const data = await res.json();
+    if (data.ok && data.steps?.length) matchSteps = data.steps;
+  } catch (_) {}
 
-    if (i < selectedStops.length - 1) {
-      const next = selectedStops[i + 1];
-      txt += `${"─".repeat(36)}\n`;
+  // Pre-compute display numbers: role stops (START/END) are unnumbered; all others count from 1
+  let _n = 0;
+  const stopNumbers = selectedStops.map(s =>
+    (s.role === 'start' || s.role === 'end' || s.role === 'startend') ? null : ++_n
+  );
 
-      if (orsSegments && orsSegments[i]) {
-        const seg    = orsSegments[i];
-        const distKm = (seg.distance / 1000).toFixed(2);
-        const mins   = Math.round(seg.duration / 60);
-        txt += `${distKm} km · ~${mins} min\n\n`;
-        const filtered = (seg.steps || []).filter(step => {
-          if (step.type === 10) return false;
-          const hasStreet = step.name && step.name !== '-';
-          return hasStreet || step.type === 11;
-        });
-        const merged = [];
-        for (const step of filtered) {
-          const prev = merged[merged.length - 1];
-          if (prev && step.name && step.name !== '-' && step.name === prev.name) {
-            prev.distance += step.distance;
-          } else {
-            merged.push({ ...step });
-          }
-        }
-        merged.forEach(step => {
-          const inst = step.instruction || '';
-          const dist = step.distance >= 20
-            ? ` (${step.distance >= 1000 ? ((step.distance/1000).toFixed(1)+' km') : (Math.round(step.distance)+' m')})`
-            : '';
-          if (inst) txt += `  ${inst}${dist}\n`;
-        });
+  if (matchSteps) {
+    // Keep stop markers always; drop steps with trivial distance or no instruction.
+    // Note: turn steps without a street name (e.g. "Turn right") are kept — they
+    // still carry useful direction information even when Nominatim returned nothing.
+    const filtered = matchSteps.filter(step =>
+      step.stop_index !== undefined ||
+      (step.instruction && (step.distance_m || 0) >= 30)
+    );
+
+    // Merge consecutive steps on same named street; never merge across stop markers
+    // or across steps with no street name (they need to stay as distinct instructions)
+    const merged = [];
+    for (const step of filtered) {
+      const prev = merged[merged.length - 1];
+      if (prev &&
+          step.stop_index === undefined && prev.stop_index === undefined &&
+          step.street_name && step.street_name !== '-' &&
+          step.street_name === prev.street_name) {
+        prev.distance_m += step.distance_m || 0;
       } else {
-        const d    = straightLineDist(s, next);
-        const mins = Math.round(d / 83.33);
-        txt += `~${(d / 1000).toFixed(2)} km · ~${mins} min (straight-line estimate)\n`;
+        merged.push({ ...step });
       }
-      txt += `\n  → ${next.name}\n\n`;
-    } else {
-      txt += "(final destination)\n";
     }
-    txt += "\n";
+
+    for (const step of merged) {
+      if (step.stop_index !== undefined) {
+        const s = selectedStops[step.stop_index];
+        if (!s) continue;
+        const isLast   = step.stop_index === selectedStops.length - 1;
+        const onRoute  = distToRoute(s) <= 120;
+        if (onRoute) {
+          txt += "\n";
+          const label = s.role === 'start'    ? 'START'       :
+                        s.role === 'end'      ? 'END'         :
+                        s.role === 'startend' ? 'START / END' :
+                        `STOP ${stopNumbers[step.stop_index]}`;
+          txt += `${label}  —  ${s.name}\n`;
+          if (s.notes) txt += `  Note: ${s.notes}\n`;
+          if (isLast)  txt += "(final destination)\n";
+          txt += "\n";
+        }
+        // Emit this step's instruction if it has a named street, sufficient distance, and not on final stop
+        if (!isLast && step.instruction && step.street_name && step.street_name !== '-' && (step.distance_m || 0) >= 30) {
+          const d    = step.distance_m || 0;
+          const dist = d >= 20 ? ` (${d >= 1000 ? ((d/1000).toFixed(1)+' km') : (Math.round(d)+' m')})` : '';
+          txt += `  ${step.instruction}${dist}\n`;
+        }
+      } else {
+        const inst = step.instruction || '';
+        const d    = step.distance_m  || 0;
+        const dist = d >= 20 ? ` (${d >= 1000 ? ((d/1000).toFixed(1)+' km') : (Math.round(d)+' m')})` : '';
+        if (inst) txt += `  ${inst}${dist}\n`;
+      }
+    }
+  } else {
+    // Fallback: stops with straight-line distances
+    for (let i = 0; i < selectedStops.length; i++) {
+      const s     = selectedStops[i];
+      const label = s.role === 'start'    ? 'START'       :
+                    s.role === 'end'      ? 'END'         :
+                    s.role === 'startend' ? 'START / END' :
+                    `STOP ${stopNumbers[i]}`;
+      txt += `${label}  —  ${s.name}\n`;
+      if (s.notes) txt += `  Note: ${s.notes}\n`;
+      if (i < selectedStops.length - 1) {
+        const next = selectedStops[i + 1];
+        const d    = straightLineDist(s, next);
+        txt += `${"─".repeat(36)}\n`;
+        txt += `~${(d / 1000).toFixed(2)} km · ~${Math.round(d / 83.33)} min (straight-line estimate)\n`;
+        txt += `\n  → ${next.name}\n`;
+      } else {
+        txt += "(final destination)\n";
+      }
+      txt += "\n";
+    }
   }
 
   txt += sep + "\n";
@@ -242,6 +280,15 @@ function modifierText(modifier) {
 function bearingToCardinal(bearing) {
   const dirs = ['north','northeast','east','southeast','south','southwest','west','northwest'];
   return dirs[Math.round((bearing % 360) / 45) % 8];
+}
+
+function distToRoute(stop) {
+  let min = Infinity;
+  for (const c of routeCoords) {
+    const d = straightLineDist(stop, { lat: c[0], lng: c[1] });
+    if (d < min) min = d;
+  }
+  return min;
 }
 
 function straightLineDist(a, b) {
