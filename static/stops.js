@@ -19,7 +19,7 @@ function showAddStopPopup(lat, lng, prefillName) {
   const catPickerHtml = modeItems.map(({key, html, title}) => {
     const keyStr = key === null ? 'null' : `'${key}'`;
     const active = addStopMode === key;
-    return `<button class="mode-btn${active ? ' active' : ''}" data-cat="${key ?? '__num__'}" onclick="selectPopupCat(${keyStr})" title="${title}">${html}</button>`;
+    return `<button class="mode-btn${active ? ' active' : ''}" data-cat="${key ?? '__num__'}" onclick="selectPopupCat(${keyStr})"><span class="mode-btn-icon">${html}</span><span class="mode-btn-label">${title}</span></button>`;
   }).join('');
 
   const html = `
@@ -167,6 +167,7 @@ function renderStops() {
   badge.textContent = selectedStops.length ? `(${selectedStops.length})` : "";
   empty.style.display = selectedStops.length ? "none" : "block";
   document.getElementById("clearStopsBtn").style.display = selectedStops.length ? "inline-flex" : "none";
+  document.getElementById("routeAllBtn").style.display = selectedStops.length >= 2 ? "inline-flex" : "none";
   ctrl.style.display = selectedStops.length ? "flex" : "none";
 
   const stopCumDs = computeStopCumulDists();

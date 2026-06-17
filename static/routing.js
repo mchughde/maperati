@@ -77,34 +77,37 @@ async function routeLoopClose() {
 }
 
 async function autoRouteBetweenStops() {
-  if (selectedStops.length < 2) { alert("Add at least 2 stops first."); return; }
+  if (selectedStops.length < 2) return;
   pushUndo();
   clearDrawing();
-  const btn = document.getElementById("autoRouteBtn");
-  if (btn) { btn.textContent = "Routing…"; btn.disabled = true; }
+  const btn = document.getElementById("routeAllBtn");
+  const total = selectedStops.length - 1;
 
   for (let i = 0; i < selectedStops.length - 1; i++) {
-    const a = selectedStops[i], b = selectedStops[i+1];
+    const a = selectedStops[i], b = selectedStops[i + 1];
+    if (btn) { btn.textContent = `Routing ${i + 1} of ${total}…`; btn.disabled = true; }
     try {
       const res = await fetch("/api/snap-segment", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from: [a.lat, a.lng], to: [b.lat, b.lng] }),
       });
       const data = await res.json();
-      const coords = (data.ok && data.coords.length > 1) ? data.coords : [[a.lat,a.lng],[b.lat,b.lng]];
+      const coords = (data.ok && data.coords.length > 1) ? data.coords : [[a.lat, a.lng], [b.lat, b.lng]];
       const segCoords = i === 0 ? coords : coords.slice(1);
       routeCoords.push(...segCoords);
       routeSegments.push(segCoords.length);
       routeDistM += data.distance_m || calcDist(segCoords);
       dotMarkers.push(null);
     } catch(e) {}
+    if (i < total - 1) await new Promise(r => setTimeout(r, 300));
   }
 
   redrawRoute();
   updateRouteStats();
+  syncEditMenu();
   document.getElementById("editMenuBtn").style.display = "flex";
   document.getElementById("editDivider").style.display = "block";
-  if (routePolyline) map.fitBounds(routePolyline.getBounds(), {padding:[40,40]});
-  if (btn) { btn.textContent = "Route via stops"; btn.disabled = false; }
+  if (routePolyline) map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+  if (btn) { btn.textContent = "Route all stops"; btn.disabled = false; }
 }

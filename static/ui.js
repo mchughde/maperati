@@ -95,7 +95,7 @@ function renderAddStopModeRow() {
   row.innerHTML = items.map(({key, html, title}) => {
     const keyStr = key === null ? 'null' : `'${key}'`;
     const active = addStopMode === key;
-    return `<button class="mode-btn${active ? ' active' : ''}" data-cat="${key ?? '__num__'}" onclick="setAddStopMode(${keyStr})" title="${title}">${html}</button>`;
+    return `<button class="mode-btn${active ? ' active' : ''}" data-cat="${key ?? '__num__'}" onclick="setAddStopMode(${keyStr})"><span class="mode-btn-icon">${html}</span><span class="mode-btn-label">${title}</span></button>`;
   }).join('');
 }
 
