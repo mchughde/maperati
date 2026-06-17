@@ -231,6 +231,7 @@ function _writeSession() {
       routeSegments,
       routeDistM,
       customIdSeq,
+      detourPoints,
       walkName: document.getElementById('exportName').value,
       mapCenter: [map.getCenter().lat, map.getCenter().lng],
       mapZoom: map.getZoom(),
@@ -285,6 +286,15 @@ function restoreSession() {
       console.warn('restoreSession stops error:', e);
       try { renderStopMarkers(); } catch(_) {}
     }
+  }
+
+  if (data.detourPoints?.length) {
+    try {
+      data.detourPoints.forEach(p => {
+        detourPoints.push(p);
+        addDetourMarker(p.lat, p.lng);
+      });
+    } catch(e) { console.warn('restoreSession detour error:', e); }
   }
 
   try {

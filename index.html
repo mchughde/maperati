@@ -28,7 +28,6 @@
         <button class="btn btn-secondary" onclick="exportAs('kml')">KML</button>
         <button class="btn btn-secondary" onclick="exportAs('csv')">CSV stops</button>
       </div>
-      <button class="btn btn-secondary btn-block" onclick="exportAs('directions')" style="margin-bottom:6px">Text directions</button>
       <button class="btn btn-secondary btn-block" id="printAreaBtn" onclick="togglePrintAreaMode();toggleExportDropdown()" style="margin-bottom:4px">Set image area</button>
       <button class="btn btn-secondary btn-block" id="clearPrintAreaBtn" onclick="clearPrintArea()" style="display:none;margin-bottom:4px">Clear area</button>
       <button class="btn btn-secondary btn-block" onclick="exportMapImage();toggleExportDropdown()" style="margin-bottom:6px">Export image (JPG)</button>
@@ -226,6 +225,9 @@
   <div id="ctxMenu" style="display:none;position:absolute;background:white;border:1px solid #ddd;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,0.15);z-index:2000;min-width:160px;font-size:0.82rem">
     <div id="ctxRedoFrom" style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='#f5f8f5'" onmouseout="this.style.background=''">
       Redo route from here
+    </div>
+    <div id="ctxViaHere" style="padding:8px 14px;cursor:pointer" onmouseover="this.style.background='#f5f8f5'" onmouseout="this.style.background=''">
+      Route via here
     </div>
     <div style="padding:8px 14px;cursor:pointer;color:#DC2626" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''" onclick="clearDrawing();hideCtx()">
       Clear entire route

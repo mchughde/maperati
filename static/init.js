@@ -12,6 +12,9 @@ map.on("contextmenu", (e) => {
   ctx.style.top  = (e.originalEvent.offsetY + 8) + "px";
   document.getElementById("ctxRedoFrom").onclick =
     () => redoFromHere(e.latlng.lat, e.latlng.lng);
+  const viaEl = document.getElementById("ctxViaHere");
+  viaEl.style.display = drawing ? 'none' : 'block';
+  viaEl.onclick = () => routeViaHere(e.latlng.lat, e.latlng.lng);
 });
 
 // Keyboard shortcuts

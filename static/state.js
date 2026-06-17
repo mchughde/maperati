@@ -45,6 +45,8 @@ let _elevTimer;
 let _saveTimer;
 let undoStack = [];
 let redoStack = [];
+let detourPoints     = [];  // [{lat, lng}] — serialised to session
+let detourMarkerList = [];  // parallel Leaflet markers (not serialised)
 
 const SESSION_KEY = 'maperati_session';
 

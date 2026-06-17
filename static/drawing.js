@@ -10,6 +10,7 @@ function snapshotState() {
     dotMarkersLen: dotMarkers.length,
     stops:         selectedStops.map(s => ({...s})),
     stopUndoStack: [...stopUndoStack],
+    detourPoints:  detourPoints.map(p => ({...p})),
   };
 }
 
@@ -27,6 +28,13 @@ function applySnapshot(snap) {
   dotMarkers    = new Array(snap.dotMarkersLen).fill(null);
   selectedStops = snap.stops.map(s => ({...s}));
   stopUndoStack = [...snap.stopUndoStack];
+  clearDetourMarkers();
+  if (snap.detourPoints) {
+    snap.detourPoints.forEach(p => {
+      detourPoints.push({...p});
+      addDetourMarker(p.lat, p.lng);
+    });
+  }
   clearElevation();
   redrawRoute();
   renderStops();
@@ -220,6 +228,7 @@ function clearDrawing() {
   if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
   routeEndpointMarkers.forEach(m => map.removeLayer(m));
   routeEndpointMarkers = [];
+  clearDetourMarkers();
   document.getElementById("routeStats").style.display = "none";
   closeEditDropdown();
   hideCtx();
@@ -295,6 +304,7 @@ async function erasePoint(lat, lng) {
     }
 
     menuBtn.textContent = "Edit ▾";
+    clearDetourMarkers();
     routeDistM = calcDist(routeCoords);
     redrawRoute();
     if (routeCoords.length > 1) updateRouteStats();
@@ -351,4 +361,105 @@ function findNearestRouteIndex(lat, lng) {
     if (d < bestDist) { bestDist = d; best = i; }
   });
   return best;
+}
+
+// ── Detour waypoints ──────────────────────────────────────
+
+function clearDetourMarkers() {
+  detourMarkerList.forEach(m => map.removeLayer(m));
+  detourMarkerList = [];
+  detourPoints = [];
+}
+
+function addDetourMarker(lat, lng) {
+  const marker = L.circleMarker([lat, lng], {
+    radius: 6, color: '#c2410c', fillColor: '#f97316',
+    fillOpacity: 0.9, weight: 2, pane: 'markerPane'
+  }).addTo(map);
+  marker.bindTooltip('Detour point — click to remove', { direction: 'top', offset: [0, -8] });
+  marker.on('click', function(e) {
+    L.DomEvent.stopPropagation(e);
+    if (drawing || eraseMode) return;
+    const idx = detourMarkerList.indexOf(marker);
+    if (idx >= 0) {
+      map.removeLayer(marker);
+      detourMarkerList.splice(idx, 1);
+      detourPoints.splice(idx, 1);
+      saveSession();
+    }
+  });
+  detourMarkerList.push(marker);
+}
+
+function segmentBoundaries(nearestIdx) {
+  let pos = 0;
+  for (let i = 0; i < routeSegments.length; i++) {
+    const segEnd = pos + routeSegments[i] - 1;
+    if (nearestIdx <= segEnd) return [pos, segEnd];
+    pos += routeSegments[i];
+  }
+  return [0, routeCoords.length - 1];
+}
+
+async function routeViaHere(lat, lng) {
+  if (routeCoords.length < 2) return;
+  hideCtx();
+
+  let viaLat = lat, viaLng = lng;
+  try {
+    const res = await fetch('/api/snap-point', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ point: [lat, lng] })
+    });
+    const data = await res.json();
+    if (data.ok && data.point) { viaLat = data.point[0]; viaLng = data.point[1]; }
+  } catch(e) {}
+
+  const nearestIdx = findNearestRouteIndex(viaLat, viaLng);
+  const [leftIdx, rightIdx] = segmentBoundaries(nearestIdx);
+
+  if (leftIdx >= rightIdx) { showToast('Could not insert detour here.'); return; }
+
+  pushUndo();
+  showToast('Routing detour…');
+
+  try {
+    const p1 = routeCoords[leftIdx];
+    const p2 = routeCoords[rightIdx];
+
+    const [r1, r2] = await Promise.all([
+      fetch('/api/snap-segment', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ from: p1, to: [viaLat, viaLng] })
+      }),
+      fetch('/api/snap-segment', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ from: [viaLat, viaLng], to: p2 })
+      })
+    ]);
+    const d1 = await r1.json();
+    const d2 = await r2.json();
+
+    if (!d1.coords?.length || !d2.coords?.length) {
+      showToast('Could not route via that point.');
+      undoStack.pop(); syncEditMenu();
+      return;
+    }
+
+    const newCoords = [...d1.coords, ...d2.coords.slice(1)];
+    routeCoords.splice(leftIdx, rightIdx - leftIdx + 1, ...newCoords);
+    routeSegments = [routeCoords.length];
+    dotMarkers = [null];
+
+    detourPoints.push({ lat: viaLat, lng: viaLng });
+    addDetourMarker(viaLat, viaLng);
+
+    routeDistM = calcDist(routeCoords);
+    redrawRoute();
+    updateRouteStats();
+    showToast('Detour applied. Click the orange marker to remove it.');
+  } catch(e) {
+    showToast('Could not route via that point.');
+    undoStack.pop(); syncEditMenu();
+  }
 }
