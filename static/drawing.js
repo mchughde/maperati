@@ -421,6 +421,20 @@ async function routeViaHere(lat, lng) {
   if (leftIdx >= rightIdx) { showToast('Could not insert detour here.'); return; }
 
   pushUndo();
+
+  // Show the detour marker immediately at the snapped point, before routing
+  detourPoints.push({ lat: viaLat, lng: viaLng });
+  addDetourMarker(viaLat, viaLng);
+  const detourMarker = detourMarkerList[detourMarkerList.length - 1];
+  const removeDetour = () => {
+    const mi = detourMarkerList.indexOf(detourMarker);
+    if (mi >= 0) {
+      map.removeLayer(detourMarker);
+      detourMarkerList.splice(mi, 1);
+      detourPoints.splice(mi, 1);
+    }
+  };
+
   showToast('Routing detour…');
 
   try {
@@ -442,6 +456,7 @@ async function routeViaHere(lat, lng) {
 
     if (!d1.coords?.length || !d2.coords?.length) {
       showToast('Could not route via that point.');
+      removeDetour();
       undoStack.pop(); syncEditMenu();
       return;
     }
@@ -451,15 +466,13 @@ async function routeViaHere(lat, lng) {
     routeSegments = [routeCoords.length];
     dotMarkers = [null];
 
-    detourPoints.push({ lat: viaLat, lng: viaLng });
-    addDetourMarker(viaLat, viaLng);
-
     routeDistM = calcDist(routeCoords);
     redrawRoute();
     updateRouteStats();
-    showToast('Detour applied. Click the orange marker to remove it.');
+    showToast('Detour added.');
   } catch(e) {
     showToast('Could not route via that point.');
+    removeDetour();
     undoStack.pop(); syncEditMenu();
   }
 }
