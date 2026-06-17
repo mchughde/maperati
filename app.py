@@ -31,6 +31,17 @@ ORS_API_KEY  = os.environ.get("ORS_API_KEY", "")
 ORS_BASE          = "https://api.openrouteservice.org/v2"
 ORS_ELEVATION_URL = "https://api.openrouteservice.org/elevation/line"
 
+# ── Debug helper ──────────────────────────────────────────────────────────────
+
+_DBG_LOG = BASE_DIR / "debug_directions.log"
+
+def _dbg(msg):
+    import datetime
+    line = f"{datetime.datetime.now().isoformat()} {msg}\n"
+    print(line, end="")
+    with open(_DBG_LOG, "a") as f:
+        f.write(line)
+
 
 # ── Polyline decoder ─────────────────────────────────────────────────────────
 
@@ -324,6 +335,479 @@ def directions():
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
+
+
+# ── Map-match helpers ────────────────────────────────────────────────────────
+
+def _haversine_m(lat1, lng1, lat2, lng2):
+    R = 6371000
+    d_lat = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = (math.sin(d_lat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(d_lng / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _cum_dists_m(coords):
+    dists = [0.0]
+    for i in range(1, len(coords)):
+        dists.append(dists[-1] + _haversine_m(
+            coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]))
+    return dists
+
+
+def _downsample_coords(coords, max_pts):
+    if len(coords) <= max_pts:
+        return coords
+    step = (len(coords) - 1) / (max_pts - 1)
+    return [coords[round(i * step)] for i in range(max_pts)]
+
+
+def _bearing(a, b):
+    """Compass bearing in degrees from point a to point b ([lat,lng] pairs)."""
+    d_lng = math.radians(b[1] - a[1])
+    lat1  = math.radians(a[0])
+    lat2  = math.radians(b[0])
+    x = math.sin(d_lng) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(d_lng)
+    return (math.degrees(math.atan2(x, y)) + 360) % 360
+
+
+def _angle_diff(b1, b2):
+    """Absolute angular difference between two bearings (0–180°)."""
+    d = abs(b1 - b2) % 360
+    return d if d <= 180 else 360 - d
+
+
+def _downsample_turn_aware(coords, max_pts, turn_threshold=15):
+    """Downsample, always keeping points where bearing changes >= turn_threshold degrees."""
+    if len(coords) <= max_pts:
+        return coords
+
+    # Identify turn indices (bearing change >= threshold at that point)
+    must = {0, len(coords) - 1}
+    for i in range(1, len(coords) - 1):
+        b_in  = _bearing(coords[i - 1], coords[i])
+        b_out = _bearing(coords[i],     coords[i + 1])
+        if _angle_diff(b_in, b_out) >= turn_threshold:
+            must.add(i)
+
+    # If turns alone exceed budget, keep the sharpest ones
+    if len(must) > max_pts:
+        turns = sorted(
+            (i for i in must if i not in (0, len(coords) - 1)),
+            key=lambda i: _angle_diff(
+                _bearing(coords[i - 1], coords[i]),
+                _bearing(coords[i],     coords[i + 1])
+            ),
+            reverse=True
+        )
+        must = {0, len(coords) - 1} | set(turns[:max_pts - 2])
+
+    # Fill remaining budget with evenly-spaced points
+    remaining = max_pts - len(must)
+    if remaining > 0:
+        optional = [i for i in range(1, len(coords) - 1) if i not in must]
+        if optional:
+            step = len(optional) / remaining
+            for k in range(remaining):
+                must.add(optional[round(k * step)])
+
+    return [coords[i] for i in sorted(must)]
+
+
+def _osrm_step_instruction(m_type, modifier, street):
+    modifiers = {
+        'uturn': 'Make a U-turn', 'sharp right': 'Turn sharp right',
+        'right': 'Turn right', 'slight right': 'Bear right',
+        'straight': 'Continue straight', 'slight left': 'Bear left',
+        'left': 'Turn left', 'sharp left': 'Turn sharp left',
+    }
+    on = f' on {street}' if street else ''
+    if m_type == 'depart':
+        return f'Head forward{on}'
+    if m_type == 'arrive':
+        return 'Arrive at destination'
+    if m_type in ('turn', 'end of road'):
+        return modifiers.get(modifier, 'Continue') + on
+    if m_type == 'new name':
+        return f'Continue{on}'
+    if m_type in ('roundabout', 'rotary'):
+        return f'At the roundabout, take exit{on}'
+    if m_type == 'fork':
+        side = 'right' if modifier and 'right' in modifier else 'left'
+        return f'Keep {side}{on}'
+    if m_type == 'merge':
+        return f'Merge{on}'
+    return f'Continue{on}'
+
+
+def _ors_directions_steps(coords):
+    """ORS directions with waypoints tracing the drawn path. Returns (steps, dist_m, dur_s) or None."""
+    # ORS free tier allows up to 50 waypoints; prioritise turn points
+    wpts = _downsample_turn_aware(coords, 50)
+    payload = json.dumps({
+        "coordinates": [[c[1], c[0]] for c in wpts],
+        "instructions": True,
+        "language": "en",
+        "units": "m",
+    }).encode()
+    req = urllib.request.Request(
+        f"{ORS_BASE}/directions/foot-walking/geojson",
+        data=payload, headers=_ors_headers(), method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read())
+    features = data.get("features") or []
+    if not features:
+        return None
+    props    = features[0]["properties"]
+    segments = props.get("segments") or []
+    summary  = props.get("summary") or {}
+    geom_coords = features[0]["geometry"]["coordinates"]  # [lng, lat] pairs
+    steps = []
+    for seg in segments:
+        for s in seg.get("steps") or []:
+            if s.get("type") == 10:   # arrive step
+                continue
+            wp  = s.get("way_points") or [0]
+            idx = wp[0] if wp else 0
+            loc = geom_coords[idx] if idx < len(geom_coords) else geom_coords[0]
+            steps.append({
+                "instruction": s.get("instruction", ""),
+                "street_name": s.get("name", ""),
+                "distance_m":  s.get("distance", 0),
+                "location":    [loc[1], loc[0]],   # [lat, lng]
+            })
+    return steps, summary.get("distance", 0), summary.get("duration", 0)
+
+
+def _osrm_route_steps(coords):
+    """OSRM route with waypoints tracing the drawn path. Returns (steps, dist_m, dur_s) or None."""
+    coord_str = ";".join(f"{c[1]},{c[0]}" for c in coords)
+    url = (f"{OSRM_URL}/route/v1/{OSRM_PROFILE}/{coord_str}"
+           f"?steps=true&annotations=false&geometries=geojson&overview=full")
+    req = urllib.request.Request(url, headers={"User-Agent": "walking-map-app/2.0"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read())
+    if data.get("code") != "Ok" or not data.get("routes"):
+        return None
+    route      = data["routes"][0]
+    total_dist = route.get("distance", 0)
+    total_dur  = route.get("duration", 0)
+    steps = []
+    for leg in route.get("legs") or []:
+        for s in leg.get("steps") or []:
+            m      = s.get("maneuver") or {}
+            m_type = m.get("type", "")
+            m_mod  = m.get("modifier", "")
+            street = s.get("name", "")
+            if m_type == "arrive":
+                continue
+            loc = m.get("location", [0, 0])   # [lng, lat]
+            steps.append({
+                "instruction": _osrm_step_instruction(m_type, m_mod, street),
+                "street_name": street,
+                "distance_m":  s.get("distance", 0),
+                "location":    [loc[1], loc[0]],   # [lat, lng]
+            })
+    return steps, total_dist, total_dur
+
+
+def _bearing_to_cardinal(bearing):
+    dirs = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest']
+    return dirs[round((bearing % 360) / 45) % 8]
+
+
+def _angle_to_verb(angle):
+    """Map signed bearing change (degrees) to a turn instruction verb."""
+    a = abs(angle)
+    if a < 20:
+        return "Continue straight"
+    side = "right" if angle > 0 else "left"
+    if a < 50:
+        return f"Bear {side}"
+    elif a < 130:
+        return f"Turn {side}"
+    else:
+        return f"Turn sharp {side}"
+
+
+_GEO_CACHE = {}       # {(round(lat,5), round(lng,5)): name}  — survives across requests
+_GEO_LAST  = [0.0]    # monotonic time of last real network call (rate-limit guard)
+
+def _nominatim_street(lat, lng):
+    """Reverse-geocode a point and return the road/street name, or empty string.
+
+    Cached by rounded coordinate so repeated points (and repeated runs while the
+    server stays up) cost nothing. A single rate-limit guard keeps real calls at
+    most one per ~1.05 s, honouring Nominatim's usage policy. Neither caching nor
+    the guard changes WHICH name a point returns — only how often we ask.
+    """
+    import time
+    key = (round(lat, 5), round(lng, 5))
+    if key in _GEO_CACHE:
+        return _GEO_CACHE[key]
+
+    # Space real requests >= 1.05 s apart (Nominatim allows max 1 req/sec)
+    wait = 1.05 - (time.monotonic() - _GEO_LAST[0])
+    if wait > 0:
+        time.sleep(wait)
+
+    url = (f"https://nominatim.openstreetmap.org/reverse"
+           f"?lat={lat}&lon={lng}&format=json&zoom=17")
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "maperati/1.0 (mchughde@gmail.com)"})
+    name = ""
+    try:
+        with urllib.request.urlopen(req, timeout=6) as r:
+            d = json.loads(r.read())
+        a = d.get("address", {})
+        name = (a.get("road") or a.get("pedestrian") or a.get("footway")
+                or a.get("path") or a.get("square") or "")
+        # Discard placeholder names OSM uses for unnamed ways: anything that has
+        # no letters or digits (covers "-", "–", "—", "?", "−", blanks, etc.)
+        if name and not any(c.isalnum() for c in name):
+            name = ""
+        name = name.strip()
+    except Exception:
+        name = ""
+    finally:
+        _GEO_LAST[0] = time.monotonic()
+
+    _GEO_CACHE[key] = name
+    return name
+
+
+def _detect_turns(coords, turn_threshold=25, merge_dist_m=40, window_m=35):
+    """Find significant turns in coords.
+
+    Returns list of (coord_index, signed_angle_deg, cumulative_dist_m).
+    Positive angle = clockwise = right; negative = anticlockwise = left.
+    Nearby turns within merge_dist_m are merged, keeping the sharpest.
+    """
+    cum = _cum_dists_m(coords)
+    raw = []
+    for i in range(1, len(coords) - 1):
+        bi = i
+        while bi > 0 and cum[i] - cum[bi] < window_m:
+            bi -= 1
+        di = i
+        while di < len(coords) - 1 and cum[di] - cum[i] < window_m:
+            di += 1
+        if bi == i or di == i:
+            continue
+        in_b  = _bearing(coords[bi], coords[i])
+        out_b = _bearing(coords[i],  coords[di])
+        angle = ((out_b - in_b + 180) % 360) - 180
+        if turn_threshold <= abs(angle) < 165:  # ignore near-180° reversals (GPS artifacts)
+            raw.append((i, angle, cum[i]))
+    merged = []
+    for t in raw:
+        if merged and t[2] - merged[-1][2] < merge_dist_m:
+            if abs(t[1]) > abs(merged[-1][1]):
+                merged[-1] = t
+        else:
+            merged.append(t)
+    return merged
+
+
+def _geometry_directions(orig_coords):
+    """Generate turn-by-turn directions purely from drawn route geometry.
+
+    Turn positions come from bearing-change detection on orig_coords.
+    Street names come from Nominatim reverse-geocoding a point 25 m past each turn.
+    Returns (steps, total_dist_m, total_dur_s) or None on failure.
+    Each step: {instruction, street_name, distance_m, location:[lat,lng]}.
+    """
+    import time
+    if len(orig_coords) < 2:
+        return None
+
+    cum   = _cum_dists_m(orig_coords)
+    n     = len(orig_coords)
+
+    turns = _detect_turns(orig_coords)
+
+    # Events: (coord_index, kind, angle)  kind = 'depart' | 'turn'
+    events = [(0, "depart", 0.0)] + [(t[0], "turn", t[1]) for t in turns]
+
+    steps = []
+    for k, (ci, kind, angle) in enumerate(events):
+        next_ci = events[k + 1][0] if k + 1 < len(events) else n - 1
+        seg_dist = cum[next_ci] - cum[ci]
+
+        # Name the street you travel AFTER this turn: the segment between this
+        # turn (ci) and the next event (next_ci). Sample by FRACTION of that
+        # segment and clamp strictly inside it, so a nearby following turn can
+        # never steal this turn's street name (the Place-du-Louvre bug, where a
+        # fixed 50 m look-ahead overshot the next turn ~50 m away).
+        seg_len = cum[next_ci] - cum[ci]
+        street  = ""
+        gi      = min(ci + 1, n - 1)
+        for frac in (0.5, 0.65, 0.35, 0.8):
+            target = cum[ci] + seg_len * frac
+            gj = ci
+            while gj < next_ci and cum[gj] < target:
+                gj += 1
+            gj = max(min(gj, next_ci), min(ci + 1, n - 1))
+            gi = gj
+            name = _nominatim_street(orig_coords[gj][0], orig_coords[gj][1])
+            if name:
+                street = name
+                break
+            # No manual sleep: _nominatim_street enforces the rate limit centrally.
+
+        if kind == "depart":
+            out_b = _bearing(orig_coords[ci], orig_coords[gi]) if gi != ci else 0
+            verb  = f"Head {_bearing_to_cardinal(out_b)}"
+            on    = f" on {street}" if street else ""
+        else:
+            verb = _angle_to_verb(angle)
+            on   = f" onto {street}" if street else ""
+
+        steps.append({
+            "instruction": f"{verb}{on}",
+            "street_name": street,
+            "distance_m":  seg_dist,
+            "location":    list(orig_coords[ci]),
+        })
+
+    total_dist = cum[-1]
+    return steps, total_dist, total_dist / 83.33   # ~5 km/h walking pace
+
+
+def _inject_stop_markers(orig_coords, stops, steps):
+    """Insert a stop marker entry for each stop, interleaved with the turn steps.
+
+    Earlier this *tagged* (and consumed) the nearest turn step, one step per
+    stop. When stops outnumbered the turn steps in a stretch — e.g. several POIs
+    clustered near the end of a loop — the surplus stops collapsed onto the final
+    step and overwrote each other, so trailing stops AND their turns vanished.
+
+    Now each stop becomes its own marker entry inserted at the right position by
+    distance-along-route; turn steps are never consumed. Result: every stop and
+    every turn is preserved. Marker entries carry stop_name/stop_index with an
+    empty instruction so the front-end renders the label but no turn text.
+
+    Coord search keeps the proportional, monotonic window so loop routes still
+    match a stop to the correct pass.
+    """
+    if not stops or not steps:
+        return steps
+    cum      = _cum_dists_m(orig_coords)
+    n_coords = len(orig_coords)
+    half_win = max(int(n_coords * 0.25), 5)
+
+    # 1) Distance-along-route for each stop (monotonic, proportional window).
+    placements    = []   # (dist_m, stop_index, stop_name, coord_index)
+    min_coord_idx = 0
+    for idx, stop in enumerate(stops):
+        frac   = idx / max(len(stops) - 1, 1)
+        center = round(frac * (n_coords - 1))
+        lo     = max(min_coord_idx, center - half_win)
+        hi     = min(n_coords, center + half_win + 1)
+        if lo >= hi:
+            hi = min(n_coords, lo + 1)
+        best_j = min(
+            range(lo, hi),
+            key=lambda j: _haversine_m(stop["lat"], stop["lng"],
+                                       orig_coords[j][0], orig_coords[j][1])
+        )
+        placements.append((cum[best_j], idx, stop.get("name", ""), best_j))
+        min_coord_idx = best_j
+
+    # 2) Distance-along-route at the START of each turn step.
+    step_start = [0.0]
+    for st in steps[:-1]:
+        step_start.append(step_start[-1] + st.get("distance_m", 0))
+
+    def _marker(p):
+        d, sidx, sname, cj = p
+        return {"instruction": "", "street_name": "", "distance_m": 0,
+                "location": list(orig_coords[cj]),
+                "stop_name": sname, "stop_index": sidx}
+
+    # 3) Merge: insert each stop marker just before the first turn step that
+    #    starts at or beyond the stop's distance. Nothing is overwritten.
+    result = []
+    pi = 0
+    for i, st in enumerate(steps):
+        while pi < len(placements) and placements[pi][0] <= step_start[i] + 1e-6:
+            result.append(_marker(placements[pi]))
+            pi += 1
+        result.append(dict(st))
+    while pi < len(placements):          # any stops past the final turn step
+        result.append(_marker(placements[pi]))
+        pi += 1
+
+    return result
+
+
+# ── Match directions ──────────────────────────────────────────────────────────
+
+@app.route("/api/match-directions", methods=["POST"])
+def match_directions():
+    body   = request.get_json()
+    coords = body.get("coords", [])   # [[lat, lng], ...]
+    stops  = body.get("stops",  [])   # [{name, lat, lng}, ...]
+
+    if len(coords) < 2:
+        return jsonify({"ok": False, "error": "Need at least 2 route coordinates"})
+
+    # Primary: geometry-first — turns detected from drawn route, street names
+    # from Nominatim reverse geocoding. Accurate to the blue line by design.
+    # Takes ~1 second per turn due to Nominatim rate limit.
+    try:
+        _dbg(f"coords count={len(coords)}, first={coords[0]}, last={coords[-1]}")
+        result = _geometry_directions(coords)
+        if result:
+            steps, total_dist, total_dur = result
+            _dbg(f"geometry_directions ok, {len(steps)} steps:")
+            for s in steps:
+                _dbg(f"  STEP: {s['instruction']}  [{s['distance_m']:.0f}m]")
+            steps = _inject_stop_markers(coords, stops, steps)
+            return jsonify({
+                "ok":               True,
+                "steps":            steps,
+                "total_distance_m": total_dist,
+                "total_duration_s": total_dur,
+            })
+    except Exception as e:
+        import traceback
+        _dbg(f"geometry_directions FAILED: {e}\n{traceback.format_exc()}")
+
+    # Fallback: ORS or OSRM routing steps (less accurate for custom routes)
+    steps = total_dist = total_dur = None
+
+    if ORS_API_KEY:
+        try:
+            r = _ors_directions_steps(coords)
+            if r:
+                steps, total_dist, total_dur = r
+        except Exception:
+            pass
+
+    if steps is None:
+        osrm_coords = _downsample_turn_aware(coords, 100)
+        try:
+            r = _osrm_route_steps(osrm_coords)
+            if r:
+                steps, total_dist, total_dur = r
+        except Exception:
+            pass
+
+    if steps is None:
+        return jsonify({"ok": False, "error": "Could not get directions"})
+
+    steps = _inject_stop_markers(coords, stops, steps)
+    return jsonify({
+        "ok":               True,
+        "steps":            steps,
+        "total_distance_m": total_dist or 0,
+        "total_duration_s": total_dur  or 0,
+    })
 
 
 # ── Tile proxy (for client-side image export) ────────────────────────────────
