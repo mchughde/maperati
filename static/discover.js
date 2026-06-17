@@ -23,15 +23,6 @@ async function searchOsmCategory(tag, mode, btn) {
   await _runOsmSearch(q);
 }
 
-async function searchOsmByName() {
-  const text = document.getElementById('osmSearchInput').value.trim();
-  if (!text) return;
-  document.querySelectorAll('.osm-cat-btn').forEach(b => b.classList.remove('active'));
-  const bbox = getBboxString();
-  const escaped = text.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-  const q = `[out:json][timeout:15];node["name"~"${escaped}",i](${bbox});out 50;`;
-  await _runOsmSearch(q);
-}
 
 async function _runOsmSearch(query) {
   const msg  = document.getElementById('osmSearchMsg');
@@ -81,7 +72,7 @@ async function _runOsmSearch(query) {
       m.on('click', ev => {
         L.DomEvent.stopPropagation(ev);
         if (drawing) addRoutePoint(lat, lon);
-        else addStop(name, lat, lon, 'osm_' + el.id);
+        else showAddStopPopup(lat, lon, name);
       });
       osmPoiMarkers.addLayer(m);
     });

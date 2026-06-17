@@ -4,7 +4,7 @@
 
 let _pendingStopLat, _pendingStopLng, _addStopPopup;
 
-function showAddStopPopup(lat, lng) {
+function showAddStopPopup(lat, lng, prefillName) {
   _pendingStopLat = lat; _pendingStopLng = lng;
   if (_addStopPopup) _addStopPopup.remove();
 
@@ -43,7 +43,12 @@ function showAddStopPopup(lat, lng) {
     .setLatLng([lat, lng])
     .setContent(html)
     .openOn(map);
-  setTimeout(() => document.getElementById("addStopNameInput")?.focus(), 50);
+  setTimeout(() => {
+    const input = document.getElementById("addStopNameInput");
+    if (!input) return;
+    if (prefillName) { input.value = prefillName; input.select(); }
+    input.focus();
+  }, 50);
 }
 
 function confirmAddStop() {
@@ -97,8 +102,8 @@ async function geocode(q) {
 function addFromGeo(lat, lng, name) {
   document.getElementById("geoResults").style.display = "none";
   document.getElementById("geoInput").value = "";
-  addStop(name, parseFloat(lat), parseFloat(lng), "geo_" + customIdSeq++);
-  map.setView([lat, lng], 16);
+  map.setView([parseFloat(lat), parseFloat(lng)], 16);
+  showAddStopPopup(parseFloat(lat), parseFloat(lng), name);
 }
 
 // ── Stop CRUD ─────────────────────────────────────────────
