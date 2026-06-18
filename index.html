@@ -37,7 +37,7 @@
       <div id="exportMsg" style="margin-top:6px"></div>
     </div>
   </div>
-  <button class="hbtn" onclick="newMap()">New walk</button>
+  <button class="hbtn" onclick="newMap()">New route</button>
   <button class="hbtn-icon" onclick="toggleFullscreen()" id="fullscreenBtn" title="Full screen">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
   </button>
@@ -120,12 +120,8 @@
       <span class="toggle">▼</span>
     </div>
     <div class="section-body open">
-      <div style="margin-bottom:6px">
-        <div style="font-size:0.65rem;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">Type</div>
-        <div id="addStopModeRow" style="display:flex;flex-wrap:wrap;gap:4px"></div>
-      </div>
       <div class="btn-row" style="margin-bottom:10px">
-        <button class="btn btn-secondary" id="mapClickBtn" onclick="toggleMapClickMode()">Click map to add stop</button>
+        <button class="btn btn-secondary" id="mapClickBtn" onclick="toggleMapClickMode()">Tap map to add stop</button>
       </div>
       <div class="form-row">
         <label>Search for a place</label>
@@ -229,10 +225,22 @@
     </div>
   </div>
 
-  <div id="routeStats">
-    <strong id="statsDist"></strong> &nbsp;·&nbsp; <span id="statsTime"></span>
-    <span style="width:1px;height:14px;background:#D0E3FF;display:inline-block;margin:0 8px;vertical-align:middle"></span>
-    <button id="elevBtn" onclick="toggleElevationPanel()" style="background:none;border:none;font-size:0.75rem;font-weight:600;color:#6878A0;cursor:pointer;padding:0;font-family:inherit">Elevation</button>
+  <div id="mapTopBar">
+    <div id="routeStats">
+      <strong id="statsDist"></strong> &nbsp;·&nbsp; <span id="statsTime"></span>
+      <span style="width:1px;height:14px;background:#D0E3FF;display:inline-block;margin:0 8px;vertical-align:middle"></span>
+      <button id="elevBtn" onclick="toggleElevationPanel()" style="background:none;border:none;font-size:0.75rem;font-weight:600;color:#6878A0;cursor:pointer;padding:0;font-family:inherit">Elevation</button>
+    </div>
+    <div id="modeBar">
+      <button id="modeBarBtn" onclick="toggleModeDropdown()">Walking ▾</button>
+      <div id="modeDropdown">
+        <button class="mode-bar-opt" data-mode="walking" onclick="setTravelMode('walking')">Walking</button>
+        <button class="mode-bar-opt" data-mode="running" onclick="setTravelMode('running')">Running</button>
+        <button class="mode-bar-opt" data-mode="hiking" onclick="setTravelMode('hiking')">Hiking</button>
+        <button class="mode-bar-opt" data-mode="cycling" onclick="setTravelMode('cycling')">Cycling</button>
+        <button class="mode-bar-opt" data-mode="driving" onclick="setTravelMode('driving')">Driving</button>
+      </div>
+    </div>
   </div>
 </div>
 

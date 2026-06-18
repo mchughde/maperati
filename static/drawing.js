@@ -108,11 +108,15 @@ function toggleDraw() {
     btn.classList.add("active");
     map.getContainer().style.cursor = "crosshair";
     if (mapClickMode) toggleMapClickMode();
+    const mapClickBtn = document.getElementById("mapClickBtn");
+    if (mapClickBtn) { mapClickBtn.disabled = true; mapClickBtn.title = "Stop drawing first"; }
   } else {
     btn.textContent = "Draw ▾";
     btn.classList.remove("active");
     map.getContainer().style.cursor = "";
     updateRouteStats();
+    const mapClickBtn = document.getElementById("mapClickBtn");
+    if (mapClickBtn) { mapClickBtn.disabled = false; mapClickBtn.title = ""; }
   }
 }
 
@@ -154,18 +158,28 @@ async function addRoutePoint(lat, lng) {
   let newCoords = [[lat, lng]];
   let segDist = 0;
 
+  // Show a temporary dot at the raw click location while snap/route resolves
+  const tempDot = L.circleMarker([lat, lng], {
+    radius: 5, color: '#2563EB', fillColor: '#2563EB',
+    fillOpacity: 0.9, weight: 2, pane: 'markerPane'
+  }).addTo(map);
+
   if (drawMode === 'auto') {
+    // Each snap segment gets its own undo step (after the first point)
+    if (routeCoords.length > 0) pushUndo();
     try {
       const res = await fetch("/api/snap-point", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ point: [lat, lng] }),
+        body: JSON.stringify({ point: [lat, lng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile }),
       });
       const data = await res.json();
       if (data.ok && data.point) { lat = data.point[0]; lng = data.point[1]; }
     } catch(e) {}
     newCoords = [[lat, lng]];
   }
+
+  map.removeLayer(tempDot);
 
   if (segDist === 0 && prev) {
     const R = 6371000;
@@ -294,7 +308,7 @@ async function erasePoint(lat, lng) {
         const res  = await fetch('/api/snap-segment', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({from: p1, to: p2}),
+          body: JSON.stringify({from: p1, to: p2, orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile}),
         });
         const data = await res.json();
         if (data.coords && data.coords.length > 2) {
@@ -350,7 +364,7 @@ function updateRouteStats() {
   if (routeCoords.length < 2) return;
   const dist = calcDist(routeCoords);
   document.getElementById("statsDist").textContent = `~${(dist/1000).toFixed(2)} km`;
-  document.getElementById("statsTime").textContent = `~${Math.round(dist/80)} min`;
+  document.getElementById("statsTime").textContent = `~${Math.round(dist / TRAVEL_MODES[travelMode].speedMpm)} min`;
   document.getElementById("routeStats").style.display = "block";
 }
 
@@ -421,7 +435,7 @@ async function routeViaHere(lat, lng) {
   try {
     const res = await fetch('/api/snap-point', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ point: [lat, lng] })
+      body: JSON.stringify({ point: [lat, lng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile })
     });
     const data = await res.json();
     if (data.ok && data.point) { viaLat = data.point[0]; viaLng = data.point[1]; }
@@ -456,11 +470,11 @@ async function routeViaHere(lat, lng) {
     const [r1, r2] = await Promise.all([
       fetch('/api/snap-segment', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ from: p1, to: [viaLat, viaLng] })
+        body: JSON.stringify({ from: p1, to: [viaLat, viaLng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile })
       }),
       fetch('/api/snap-segment', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ from: [viaLat, viaLng], to: p2 })
+        body: JSON.stringify({ from: [viaLat, viaLng], to: p2, orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile })
       })
     ]);
     const d1 = await r1.json();

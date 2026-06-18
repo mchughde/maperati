@@ -48,6 +48,15 @@ let redoStack = [];
 let detourPoints     = [];  // [{lat, lng}] — serialised to session
 let detourMarkerList = [];  // parallel Leaflet markers (not serialised)
 
+let travelMode = 'walking';
+const TRAVEL_MODES = {
+  walking: { label: 'Walking', orsProfile: 'foot-walking',    osrmProfile: 'foot', speedMpm: 75  },
+  running: { label: 'Running', orsProfile: 'foot-walking',    osrmProfile: 'foot', speedMpm: 167 },
+  hiking:  { label: 'Hiking',  orsProfile: 'foot-hiking',     osrmProfile: 'foot', speedMpm: 58  },
+  cycling: { label: 'Cycling', orsProfile: 'cycling-regular', osrmProfile: 'bike', speedMpm: 250 },
+  driving: { label: 'Driving', orsProfile: 'driving-car',     osrmProfile: 'car',  speedMpm: 1000 },
+};
+
 const SESSION_KEY = 'maperati_session';
 
 const CATEGORIES = {

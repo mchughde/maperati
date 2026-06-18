@@ -40,12 +40,14 @@ document.addEventListener("click", e => {
   }
 });
 
-// Close geo results and role dropdowns on outside click
+// Close geo results, role dropdowns, and mode dropdown on outside click
 document.addEventListener("click", e => {
   if (!document.getElementById("geoInput").contains(e.target))
     document.getElementById("geoResults").style.display = "none";
   if (!e.target.closest('.stop-role-dd') && !e.target.closest('.stop-rename'))
     document.querySelectorAll('.stop-role-dd').forEach(el => el.style.display = 'none');
+  if (!e.target.closest('#modeBar'))
+    closeModeDropdown();
 });
 
 // ── Toast ─────────────────────────────────────────────────
@@ -165,11 +167,37 @@ function onMapClick(e) {
   if (mapClickMode) { showAddStopPopup(lat, lng); return; }
 }
 
-// ── New walk ──────────────────────────────────────────────
+// ── Travel mode ───────────────────────────────────────────
+
+function toggleModeDropdown() {
+  document.getElementById('modeDropdown').classList.toggle('open');
+}
+
+function closeModeDropdown() {
+  document.getElementById('modeDropdown').classList.remove('open');
+}
+
+function setTravelMode(mode) {
+  travelMode = mode;
+  const label = TRAVEL_MODES[mode].label;
+  document.getElementById('modeBarBtn').textContent = label + ' ▾';
+  document.querySelectorAll('.mode-bar-opt').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  closeModeDropdown();
+  updateRouteStats();
+  renderStops();
+  saveSession();
+  if (routeCoords.length > 1) {
+    showToast(`Switched to ${label.toLowerCase()}. Re-draw your route for best results.`);
+  }
+}
+
+// ── New route ─────────────────────────────────────────────
 
 function newMap() {
   if ((selectedStops.length || routeCoords.length) &&
-      !confirm("Start a new walk? This will clear all stops and the current route.")) return;
+      !confirm("Start a new route? This will clear all stops and the current route.")) return;
   localStorage.removeItem(SESSION_KEY);
   undoStack = []; redoStack = [];
   clearDrawing();
@@ -232,6 +260,7 @@ function _writeSession() {
       routeDistM,
       customIdSeq,
       detourPoints,
+      travelMode,
       walkName: document.getElementById('exportName').value,
       mapCenter: [map.getCenter().lat, map.getCenter().lng],
       mapZoom: map.getZoom(),
@@ -259,6 +288,7 @@ function restoreSession() {
   } catch(e) { return; }
 
   if (data.customIdSeq) customIdSeq = data.customIdSeq;
+  if (data.travelMode && TRAVEL_MODES[data.travelMode]) setTravelMode(data.travelMode);
   try {
     if (data.walkName) document.getElementById('exportName').value = data.walkName;
   } catch(_) {}

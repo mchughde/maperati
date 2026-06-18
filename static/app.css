@@ -64,7 +64,7 @@ header .spacer{flex:1}
 .role-item-divider{height:1px;background:#E5E7EB;margin:4px 8px}
 .cat-picker-label{font-size:0.65rem;color:#9ca3af;padding:4px 12px 2px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
 .cat-option{display:flex;align-items:center;gap:7px}
-.mode-btn{border-radius:7px;border:1.5px solid transparent;background:none;cursor:pointer;padding:4px 5px 3px;display:inline-flex;flex-direction:column;align-items:center;gap:3px;transition:border-color 0.15s,background 0.15s}
+.mode-btn{border-radius:7px;border:1.5px solid transparent;background:none;cursor:pointer;padding:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:border-color 0.15s,background 0.15s;width:100%}
 .mode-btn:hover{border-color:#D0E3FF;background:#f5f8ff}
 .mode-btn.active{border-color:#2563EB;background:#EBF3FF}
 .mode-btn-icon{display:flex;align-items:center;justify-content:center}
@@ -162,14 +162,43 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--a2);back
 .edit-item:disabled{opacity:0.38;cursor:not-allowed}
 
 /* ── Route stats — top centre ── */
-#routeStats{
+#mapTopBar{
   position:absolute;top:14px;left:50%;transform:translateX(-50%);
-  z-index:1000;background:#fff;border-radius:20px;
+  z-index:1000;display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+#routeStats{
+  background:#fff;border-radius:20px;
   box-shadow:0 2px 12px rgba(0,0,0,0.1);
   padding:6px 18px;font-size:0.8rem;font-weight:600;
   display:none;white-space:nowrap;color:var(--text);
 }
 #routeStats strong{color:var(--blue)}
+#modeBar{position:relative}
+#modeBarBtn{
+  background:#fff;border:none;cursor:pointer;
+  border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,0.1);
+  padding:6px 14px;font-size:0.75rem;font-weight:600;color:#2563EB;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  white-space:nowrap;transition:background 0.15s;
+}
+#modeBarBtn:hover{background:#EBF3FF}
+#modeDropdown{
+  display:none;position:absolute;top:calc(100% + 6px);left:50%;
+  transform:translateX(-50%);
+  background:#fff;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  padding:4px;min-width:110px;z-index:1100;
+}
+#modeDropdown.open{display:block}
+.mode-bar-opt{
+  display:block;width:100%;border:none;background:none;cursor:pointer;
+  padding:7px 14px;border-radius:7px;text-align:center;
+  font-size:0.75rem;font-weight:600;color:#4B4542;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  transition:background 0.13s,color 0.13s;
+}
+.mode-bar-opt:hover{background:#f5f8ff;color:#2563EB}
+.mode-bar-opt.active{color:#2563EB;background:#EBF3FF}
 
 /* ── Dataset info ── */
 .data-info{font-size:0.71rem;color:var(--sub);margin-top:5px}
@@ -232,7 +261,7 @@ body.fullscreen #fullscreenExit{display:block}
   header,
   .sidebar,
   #drawToolbar,
-  #routeStats,
+  #mapTopBar,
   #toast,
   #fullscreenExit,
   #elevationPanel,

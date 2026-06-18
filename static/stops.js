@@ -19,7 +19,7 @@ function showAddStopPopup(lat, lng, prefillName) {
   const catPickerHtml = modeItems.map(({key, html, title}) => {
     const keyStr = key === null ? 'null' : `'${key}'`;
     const active = addStopMode === key;
-    return `<button class="mode-btn${active ? ' active' : ''}" data-cat="${key ?? '__num__'}" onclick="selectPopupCat(${keyStr})"><span class="mode-btn-icon">${html}</span><span class="mode-btn-label">${title}</span></button>`;
+    return `<button class="mode-btn${active ? ' active' : ''}" title="${title}" data-cat="${key ?? '__num__'}" onclick="selectPopupCat(${keyStr})"><span class="mode-btn-icon">${html}</span></button>`;
   }).join('');
 
   const html = `
@@ -27,14 +27,17 @@ function showAddStopPopup(lat, lng, prefillName) {
       <input id="addStopNameInput" placeholder="Stop name" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1.5px solid #D0E3FF;border-radius:7px;font-size:0.8rem;font-family:inherit;outline:none;margin-bottom:10px"/>
       <div style="margin-bottom:10px">
         <div style="font-size:0.65rem;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">Type</div>
-        <div id="popupCatRow" style="display:flex;flex-wrap:wrap;gap:4px">${catPickerHtml}</div>
+        <div id="popupCatRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${catPickerHtml}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
         <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#4B4542;cursor:pointer">
-          <input type="checkbox" id="chkStart" onchange="if(this.checked) document.getElementById('chkEnd').checked=false"> Set as start
+          <input type="checkbox" id="chkStart" onchange="if(this.checked){document.getElementById('chkEnd').checked=false;document.getElementById('chkStartEnd').checked=false}"> Set as start
         </label>
         <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#4B4542;cursor:pointer">
-          <input type="checkbox" id="chkEnd" onchange="if(this.checked) document.getElementById('chkStart').checked=false"> Set as end
+          <input type="checkbox" id="chkEnd" onchange="if(this.checked){document.getElementById('chkStart').checked=false;document.getElementById('chkStartEnd').checked=false}"> Set as end
+        </label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:#4B4542;cursor:pointer">
+          <input type="checkbox" id="chkStartEnd" onchange="if(this.checked){document.getElementById('chkStart').checked=false;document.getElementById('chkEnd').checked=false}"> Set as start &amp; end
         </label>
       </div>
       <button onclick="confirmAddStop()" style="width:100%;padding:7px;border:none;border-radius:7px;background:#1A1D2E;color:#fff;font-size:0.76rem;font-weight:600;font-family:inherit;cursor:pointer">Add</button>
@@ -56,14 +59,15 @@ function confirmAddStop() {
   const name = input ? input.value.trim() : "";
   if (!name) { input && input.focus(); return; }
   pushUndo();
-  const isStart = document.getElementById("chkStart")?.checked;
-  const isEnd   = document.getElementById("chkEnd")?.checked;
+  const isStart    = document.getElementById("chkStart")?.checked;
+  const isEnd      = document.getElementById("chkEnd")?.checked;
+  const isStartEnd = document.getElementById("chkStartEnd")?.checked;
   const id = "custom_" + customIdSeq++;
-  const role = isStart ? "start" : isEnd ? "end" : null;
+  const role = isStartEnd ? "startend" : isStart ? "start" : isEnd ? "end" : null;
   const stop = { id, name, lat: _pendingStopLat, lng: _pendingStopLng, role, notes: '', category: addStopMode || null };
-  if (isStart) selectedStops.forEach(s => { if (s.role === "start") s.role = null; });
-  if (isEnd)   selectedStops.forEach(s => { if (s.role === "end")   s.role = null; });
-  if (isStart) {
+  if (isStart || isStartEnd) selectedStops.forEach(s => { if (s.role === "start" || s.role === "startend") s.role = null; });
+  if (isEnd   || isStartEnd) selectedStops.forEach(s => { if (s.role === "end"   || s.role === "startend") s.role = null; });
+  if (isStart || isStartEnd) {
     selectedStops.unshift(stop);
   } else if (stop.category && routeCoords.length > 1) {
     insertStopByProximity(stop);
@@ -193,7 +197,7 @@ function renderStops() {
     let segInfo = '';
     if (stopCumDs && i > 0) {
       const segDist = stopCumDs[i] - stopCumDs[i - 1];
-      const mins = Math.round(segDist / 83.33);
+      const mins = Math.round(segDist / TRAVEL_MODES[travelMode].speedMpm);
       const timeStr = mins < 1 ? '< 1 min' : `${mins} min`;
       segInfo = ` · ${(segDist / 1000).toFixed(2)} km · ${timeStr}`;
     }

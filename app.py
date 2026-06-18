@@ -122,7 +122,7 @@ def _ors_headers():
     }
 
 
-def _ors_snap(lat, lng):
+def _ors_snap(lat, lng, ors_profile='foot-walking'):
     """Try ORS snap. Returns [lat, lng] or None."""
     if not ORS_API_KEY:
         return None
@@ -131,7 +131,7 @@ def _ors_snap(lat, lng):
         "radius": 40,
     }).encode()
     req = urllib.request.Request(
-        f"{ORS_BASE}/snap/foot-walking",
+        f"{ORS_BASE}/snap/{ors_profile}",
         data=payload,
         headers=_ors_headers(),
         method="POST",
@@ -145,16 +145,19 @@ def _ors_snap(lat, lng):
     return None
 
 
-def _ors_route(p1, p2):
+def _ors_route(p1, p2, ors_profile='foot-walking'):
     """Try ORS routing. Returns (coords [[lat,lng],...], dist_m) or None."""
     if not ORS_API_KEY:
         return None
-    payload = json.dumps({
+    body = {
         "coordinates": [[p1[1], p1[0]], [p2[1], p2[0]]],  # ORS expects [lng, lat]
         "preference": "recommended",
-    }).encode()
+    }
+    if ors_profile == 'driving-car':
+        body["options"] = {"avoid_features": ["ferries"]}
+    payload = json.dumps(body).encode()
     req = urllib.request.Request(
-        f"{ORS_BASE}/directions/foot-walking/geojson",
+        f"{ORS_BASE}/directions/{ors_profile}/geojson",
         data=payload,
         headers=_ors_headers(),
         method="POST",
@@ -209,18 +212,21 @@ def snap_point():
     p = body.get("point")  # [lat, lng]
     if not p:
         return jsonify({"error": "point required"}), 400
+    ors_profile  = body.get("orsProfile",  "foot-walking")
+    osrm_profile = body.get("osrmProfile", "foot")
 
     # Try ORS first
     if ORS_API_KEY:
         try:
-            snapped = _ors_snap(p[0], p[1])
+            snapped = _ors_snap(p[0], p[1], ors_profile)
             if snapped:
                 return jsonify({"ok": True, "point": snapped})
-        except Exception:
-            pass  # fall through to OSRM
+        except Exception as e:
+            print(f"ORS snap failed ({ors_profile}): {e}", flush=True)
+            # fall through to OSRM
 
     # OSRM fallback
-    url = f"{OSRM_URL}/nearest/v1/{OSRM_PROFILE}/{p[1]},{p[0]}?number=1"
+    url = f"{OSRM_URL}/nearest/v1/{osrm_profile}/{p[1]},{p[0]}?number=1"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "walking-map-app/2.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -243,7 +249,10 @@ def snap_segment():
     body = request.get_json()
     p1 = body.get("from")  # [lat, lng]
     p2 = body.get("to")    # [lat, lng]
-    max_ratio = float(body.get("max_ratio", 2.5))
+    ors_profile  = body.get("orsProfile",  "foot-walking")
+    osrm_profile = body.get("osrmProfile", "foot")
+    default_ratio = 5.0 if ors_profile == "driving-car" else 2.5
+    max_ratio = float(body.get("max_ratio", default_ratio))
 
     if not p1 or not p2:
         return jsonify({"error": "from/to required"}), 400
@@ -256,21 +265,23 @@ def snap_segment():
     # Try ORS first
     if ORS_API_KEY:
         try:
-            result = _ors_route(p1, p2)
+            result = _ors_route(p1, p2, ors_profile)
             if result:
                 coords, dist_m = result
                 if straight_m > 0 and dist_m / straight_m > max_ratio:
                     return jsonify({"ok": False, "coords": [p1, p2], "distance_m": straight_m,
                                     "warning": "Route unusually long — straight line used. Draw this segment manually for accuracy."})
                 return jsonify({"ok": True, "coords": coords, "distance_m": dist_m})
-        except Exception:
-            pass  # fall through to OSRM
+        except Exception as e:
+            print(f"ORS route failed ({ors_profile}): {e}", flush=True)
+            # fall through to OSRM
 
     # OSRM fallback
     coord_str = f"{p1[1]},{p1[0]};{p2[1]},{p2[0]}"
+    exclude_param = "&exclude=ferry" if osrm_profile == "car" else ""
     url = (
-        f"{OSRM_URL}/route/v1/{OSRM_PROFILE}/{coord_str}"
-        f"?overview=full&geometries=polyline&steps=false"
+        f"{OSRM_URL}/route/v1/{osrm_profile}/{coord_str}"
+        f"?overview=full&geometries=polyline&steps=false{exclude_param}"
     )
     try:
         req = urllib.request.Request(

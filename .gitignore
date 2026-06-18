@@ -16,6 +16,7 @@ venv/
 # Temp files written by the app
 _tmp_*
 _session_*.json
+*.log
 
 # macOS
 .DS_Store
@@ -31,6 +32,7 @@ _session_*.json
 # Backup files (old versions kept locally)
 *.bak
 *.bak2
+*.bak_*
 
 # Personal map data — stays local, never upload
 Paris Parks/

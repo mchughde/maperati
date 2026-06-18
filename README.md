@@ -60,16 +60,36 @@ The `+` / `−` zoom buttons step by **0.25** per click for fine-grained control
 
 ---
 
+## Travel mode
+
+A compact dropdown pill sits below the route stats bar. Choose the travel mode that matches your planned activity:
+
+| Mode | Speed used for time estimates | Routing profile |
+|------|------------------------------|-----------------|
+| **Walking** | 4.5 km/h | ORS foot-walking |
+| **Running** | 10 km/h | ORS foot-walking |
+| **Hiking** | 3.5 km/h | ORS foot-hiking |
+| **Cycling** | 15 km/h | ORS cycling-regular |
+| **Driving** | 60 km/h | ORS driving-car (ferries avoided) |
+
+The active mode is shown on the pill. Click to expand, click a mode to switch. Switching when a route exists shows a reminder to re-draw for best results, since the routing profile has changed.
+
+Mode is saved to your session and restored on reload.
+
+---
+
 ## Drawing a route
 
 Click **Draw ▾** in the bottom toolbar and choose a mode:
 
 | Mode | Behaviour |
 |------|-----------|
-| **Snap** | Each click snaps to the nearest road node; ORS routes between points |
+| **Snap** | Each click snaps to the nearest road node; ORS routes between points. A temporary dot appears at your click while routing is in progress. Each snap segment is a separate undo step. |
 | **Free** | Line goes exactly where you click — useful for parks, plazas, alleys |
 
 You can mix modes in the same route. Click **Stop drawing** when done.
+
+While drawing is active, the **Tap map to add stop** button in the sidebar is disabled to prevent accidental stop creation.
 
 **Edit ▾** gives you:
 - **Undo / Redo** — full undo/redo system covering all major actions (drawing, stops, routes, erasures, reversals). Keyboard shortcuts: **Cmd+Z** (undo), **Cmd+Shift+Z** or **Cmd+Y** (redo)
@@ -102,8 +122,8 @@ Use **Route via here** to force the route through a specific road without manual
 Stops are named points that carry through to all exports. They can be numbered (sequenced along the route) or category markers (descriptive icons for points of interest).
 
 ### Adding stops
-- **Click map to add stop** — places a stop at the clicked location; a popup appears with an **Add** button and a **Type** selector
-- **Type row** in the sidebar sets the default type for new stops: Stop (numbered) or one of the 7 category types
+- **Tap map to add stop** — places a stop at the clicked location; a popup appears with a name field, a type grid, start/end options, and an **Add** button
+- **Type row** in the sidebar sets the default type for new stops: Stop (numbered) or one of the category types; the popup grid reflects the current selection
 - **Search for a place** — geocodes a name or address and adds it as a stop
 
 ### Stop types
@@ -123,7 +143,7 @@ Category markers auto-insert between the nearest numbered stops when a route exi
 ### Managing stops
 - Drag ⠿ to reorder; click ✎ to rename; click × to remove
 - Click a stop's badge/icon in the sidebar to pan the map and open its popup
-- Click ⋯ to set role (**Start** / **End** / **Start & End** loop) or change category
+- Click ⋯ to set role (**Start** / **End** / **Set as start & end** loop) or change category
 - Click **Add note** to add a free-text note (exported in all formats)
 - Each stop shows walking distance and time from the previous stop
 - **Route to next** button between consecutive numbered stops — auto-routes via ORS/OSRM
@@ -207,7 +227,7 @@ Click **Clear area** to remove the rectangle and redefine. If no area is set, th
 
 ## Session persistence
 
-The current route and stops are auto-saved to browser localStorage (`maperati_session`) after every change. They are restored automatically on page reload. Click **New walk** to clear the session and start fresh.
+The current route and stops are auto-saved to browser localStorage (`maperati_session`) after every change. They are restored automatically on page reload. Click **New route** to clear the session and start fresh.
 
 To make a durable backup or move your work between machines:
 - Click **Export ▾** → **Save session file** to download a `.json` snapshot

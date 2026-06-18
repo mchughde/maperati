@@ -136,7 +136,7 @@ async function exportDirections(name) {
   const totalDist = routeDistM || (routeCoords.length > 1 ? calcDist(routeCoords) : 0);
   if (totalDist > 0) {
     txt += `Total distance:  ~${(totalDist / 1000).toFixed(2)} km\n`;
-    txt += `Estimated time:  ~${Math.round(totalDist / 83.33)} min at easy walking pace\n\n`;
+    txt += `Estimated time:  ~${Math.round(totalDist / TRAVEL_MODES[travelMode].speedMpm)} min at ${TRAVEL_MODES[travelMode].label.toLowerCase()} pace\n\n`;
   }
   txt += sep + "\n\n";
 
@@ -228,7 +228,7 @@ async function exportDirections(name) {
         const next = selectedStops[i + 1];
         const d    = straightLineDist(s, next);
         txt += `${"─".repeat(36)}\n`;
-        txt += `~${(d / 1000).toFixed(2)} km · ~${Math.round(d / 83.33)} min (straight-line estimate)\n`;
+        txt += `~${(d / 1000).toFixed(2)} km · ~${Math.round(d / TRAVEL_MODES[travelMode].speedMpm)} min (straight-line estimate)\n`;
         txt += `\n  → ${next.name}\n`;
       } else {
         txt += "(final destination)\n";

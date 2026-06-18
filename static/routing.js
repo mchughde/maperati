@@ -11,7 +11,7 @@ async function routeSegmentToNext(idx, toIdx) {
     const res = await fetch("/api/snap-segment", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ from: [a.lat, a.lng], to: [b.lat, b.lng] }),
+      body: JSON.stringify({ from: [a.lat, a.lng], to: [b.lat, b.lng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile }),
     });
     const data = await res.json();
     if (data.warning) {
@@ -53,7 +53,7 @@ async function routeLoopClose() {
     const res = await fetch("/api/snap-segment", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ from: [lastStop.lat, lastStop.lng], to: [startendStop.lat, startendStop.lng] }),
+      body: JSON.stringify({ from: [lastStop.lat, lastStop.lng], to: [startendStop.lat, startendStop.lng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile }),
     });
     const data = await res.json();
     if (data.warning) {
@@ -90,7 +90,7 @@ async function autoRouteBetweenStops() {
       const res = await fetch("/api/snap-segment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from: [a.lat, a.lng], to: [b.lat, b.lng] }),
+        body: JSON.stringify({ from: [a.lat, a.lng], to: [b.lat, b.lng], orsProfile: TRAVEL_MODES[travelMode].orsProfile, osrmProfile: TRAVEL_MODES[travelMode].osrmProfile }),
       });
       const data = await res.json();
       const coords = (data.ok && data.coords.length > 1) ? data.coords : [[a.lat, a.lng], [b.lat, b.lng]];
