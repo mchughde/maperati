@@ -137,6 +137,12 @@ Stops are named points that carry through to all exports. They can be numbered (
 | Monument | Brown icon | Category; ordered by route proximity |
 | Cafe/restaurant | Red icon | Category; ordered by route proximity |
 | Market | Teal icon | Category; ordered by route proximity |
+| Rose | Rose filled circle | Custom-purpose; ordered by route proximity |
+| Amber | Amber filled circle | Custom-purpose; ordered by route proximity |
+| Sky | Sky-blue filled circle | Custom-purpose; ordered by route proximity |
+| Lime | Lime filled circle | Custom-purpose; ordered by route proximity |
+
+The four custom types (Rose, Amber, Sky, Lime) are plain coloured circles with no predefined meaning — use them for anything: things to investigate, meeting points, areas to avoid, a second category of cafes, etc.
 
 Category markers auto-insert between the nearest numbered stops when a route exists. In a mixed list, **Route to next** connects numbered stops only; if the list has only category markers, they are all connected in sequence.
 

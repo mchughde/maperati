@@ -75,6 +75,10 @@ const CATEGORIES = {
   facilities:    { label: 'Facilities',      color: '#0f766e' },
   bar:           { label: 'Bar/wine',        color: '#a16207' },
   library:       { label: 'Library',         color: '#1d4ed8' },
+  custom1:       { label: 'Rose',            color: '#f43f5e' },
+  custom2:       { label: 'Amber',           color: '#f59e0b' },
+  custom3:       { label: 'Sky',             color: '#06b6d4' },
+  custom4:       { label: 'Lime',            color: '#84cc16' },
 };
 
 function catIconPath(cat) {

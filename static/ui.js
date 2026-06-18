@@ -13,6 +13,7 @@ function toggleSidebar() {
   sidebar.classList.toggle("collapsed");
   document.getElementById("sidebarToggle").textContent =
     sidebar.classList.contains("collapsed") ? "▶" : "☰";
+  setTimeout(() => map.invalidateSize(), 300);
 }
 
 // ── Toolbar dropdowns ──────────────────────────────────────
