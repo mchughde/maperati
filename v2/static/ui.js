@@ -332,3 +332,11 @@ function restoreSession() {
     }
   } catch(_) {}
 }
+
+function setExportRes(mult) {
+  exportResolutionMultiplier = mult;
+  [1, 2, 3].forEach(n => {
+    const btn = document.getElementById(`res-${n}x`);
+    if (btn) btn.className = 'res-btn' + (n === mult ? ' res-btn-active' : '');
+  });
+}

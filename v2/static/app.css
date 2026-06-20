@@ -265,6 +265,10 @@ body.fullscreen #fullscreenExit{display:block}
 .maplibregl-popup-content{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif!important;font-size:0.78rem!important;padding:8px 14px!important;border-radius:10px!important;box-shadow:0 3px 14px rgba(0,0,0,0.15)!important}
 .maplibregl-popup-tip{display:none}
 
+/* ── Resolution picker ── */
+.res-btn{flex:1;padding:3px 0;font-size:0.72rem;font-family:inherit;border:1.5px solid #D0E3FF;border-radius:6px;background:#fff;color:#6878A0;cursor:pointer;transition:background 0.1s}
+.res-btn-active{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600}
+
 /* ── Print ── */
 @media print {
   header,

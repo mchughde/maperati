@@ -31,6 +31,14 @@
       <button class="btn btn-secondary btn-block" onclick="exportAs('directions')" style="margin-bottom:6px">Text directions</button>
       <button class="btn btn-secondary btn-block" id="printAreaBtn" onclick="togglePrintAreaMode();toggleExportDropdown()" style="margin-bottom:4px">Set image area</button>
       <button class="btn btn-secondary btn-block" id="clearPrintAreaBtn" onclick="clearPrintArea()" style="display:none;margin-bottom:4px">Clear area</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:0.72rem;color:#6878A0;white-space:nowrap">Print quality</span>
+        <div style="display:flex;gap:2px;flex:1">
+          <button id="res-1x" class="res-btn res-btn-active" onclick="setExportRes(1)">Screen</button>
+          <button id="res-2x" class="res-btn" onclick="setExportRes(2)">2×</button>
+          <button id="res-3x" class="res-btn" onclick="setExportRes(3)">3×</button>
+        </div>
+      </div>
       <button class="btn btn-secondary btn-block" onclick="exportMapImage();toggleExportDropdown()" style="margin-bottom:6px">Export image (JPG)</button>
       <div style="height:1px;background:#D0E3FF;margin:6px 0"></div>
       <button class="btn btn-secondary btn-block" onclick="saveSessionFile()" style="font-size:0.76rem">Save session file</button>

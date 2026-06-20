@@ -158,11 +158,15 @@ In the **Export ▾** menu (top-right): set a file name, then choose:
 
 ### Image export (JPG)
 1. Optionally click **Set image area** to draw a rectangle defining the crop
-2. Click **Export image (JPG)**
+2. Choose a **Print quality** setting:
+   - **Screen** — current screen resolution (already 2× on Retina); good for on-screen use
+   - **2×** — doubles the canvas size; good for A4 printing (~200 DPI on Retina)
+   - **3×** — triples the canvas size; best print quality (~300 DPI on Retina)
+3. Click **Export image (JPG)**
 
-The map fits to the print area (or route bounds), then composites the MapLibre canvas with hand-drawn stop markers on top. Output is a JPEG at the current screen resolution.
+The map fits to the print area (or route bounds), then composites the MapLibre canvas with hand-drawn stop markers on top. Higher resolution settings take a few seconds longer while the map re-renders. Higher-res files are named with a suffix (`_2x.jpg`, `_3x.jpg`).
 
-Note: ESRI Satellite tiles support CORS so work in image export. Some raster providers may produce a blank export if they don't send CORS headers.
+**Note on raster styles**: Vector styles (OSM Bright, Liberty, Positron) benefit fully from higher resolution — text and lines are genuinely crisper. Raster styles (OpenStreetMap, CartoDB, ESRI Satellite) use fixed-size tiles so gain less — Screen or 2× is sufficient for those.
 
 ### Session file
 **Save session file** downloads a `.json` snapshot of everything — route, stops, names, roles, notes, detour points, map position. Drop it back into Import to restore exactly.

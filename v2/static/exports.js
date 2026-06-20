@@ -287,7 +287,19 @@ async function exportMapImage() {
 
   showToast('Generating image…');
 
+  const baseDpr = window.devicePixelRatio || 1;
+  const mult    = exportResolutionMultiplier || 1;
+  const effectiveDpr = baseDpr * mult;
+
+  // Temporarily increase pixel ratio for higher-res export
+  if (mult > 1) {
+    map.setPixelRatio(effectiveDpr);
+    await new Promise(resolve => map.once('idle', resolve));
+    await new Promise(r => setTimeout(r, 150));
+  }
+
   const restore = () => {
+    if (mult > 1) map.setPixelRatio(baseDpr);
     map.jumpTo({ center: prevCenter, zoom: prevZoom });
     if (printAreaBounds) {
       try { map.setLayoutProperty('print-rect-fill', 'visibility', 'visible'); } catch(_) {}
@@ -307,11 +319,14 @@ async function exportMapImage() {
     ctx.drawImage(mapCanvas, 0, 0);
 
     // map.project() returns CSS logical pixels; the canvas is in physical pixels.
-    // Multiply by devicePixelRatio to align on Retina / HiDPI displays.
-    const dpr = window.devicePixelRatio || 1;
+    // Compute the actual scale from canvas size / container size — this is correct
+    // regardless of pixel ratio or setPixelRatio() having been called.
+    const container = map.getContainer();
+    const scaleX = W / container.clientWidth;
+    const scaleY = H / container.clientHeight;
     function toPx(lat, lng) {
       const p = map.project([lng, lat]);
-      return [p.x * dpr, p.y * dpr];
+      return [p.x * scaleX, p.y * scaleY];
     }
 
     // Draw stop markers on top — mirrors renderStopMarkers() exactly
@@ -383,9 +398,10 @@ async function exportMapImage() {
     out.toBlob(blob => {
       restore();
       if (!blob) { showToast('Export failed.'); return; }
+      const suffix = mult > 1 ? `_${mult}x` : '';
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = (document.getElementById('exportName').value || 'map') + '.jpg';
+      a.download = (document.getElementById('exportName').value || 'map') + suffix + '.jpg';
       document.body.appendChild(a); a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);

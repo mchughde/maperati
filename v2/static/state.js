@@ -45,6 +45,8 @@ let redoStack = [];
 let detourPoints     = [];
 let detourMarkerList = [];  // maplibregl.Marker instances
 
+let exportResolutionMultiplier = 1;
+
 let travelMode = 'walking';
 const TRAVEL_MODES = {
   walking: { label: 'Walking', orsProfile: 'foot-walking',    osrmProfile: 'foot', speedMpm: 75  },
