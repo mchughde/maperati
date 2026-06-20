@@ -1,6 +1,14 @@
 # Maperati
 
-A local browser app for planning and exporting walking routes on OpenStreetMap. Built with Flask and Leaflet.js.
+A local browser app for planning and exporting walking routes. Built with Flask.
+
+**Current version: v2** — MapLibre GL JS with vector + raster map styles.
+Open `http://localhost:5001/v2` or run `./start.sh` to launch with the browser opening automatically.
+Full documentation: [v2/README.md](v2/README.md)
+
+**V1** (Leaflet, raster only) remains available at `http://localhost:5001` as a fallback.
+
+---
 
 ## What Maperati is for
 
@@ -50,11 +58,12 @@ pip install -r requirements.txt
 # 3. Add your ORS API key
 echo "ORS_API_KEY=your_key_here" > .env
 
-# 4. Run
-python3 app.py
+# 4. Run (opens browser at v2 automatically)
+./start.sh
 ```
 
-Opens automatically at `http://localhost:5001`. The `.env` file is gitignored — never commit your API key.
+Or run `python3 app.py` directly and open `http://localhost:5001/v2` manually.
+The `.env` file is gitignored — never commit your API key.
 
 The `+` / `−` zoom buttons step by **0.25** per click for fine-grained control.
 

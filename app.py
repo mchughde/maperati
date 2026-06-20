@@ -74,6 +74,16 @@ def index():
     return send_from_directory(str(BASE_DIR), "index.html")
 
 
+@app.route("/v2")
+def v2():
+    return send_from_directory(str(BASE_DIR / "v2"), "index.html")
+
+
+@app.route("/v2/static/<path:filename>")
+def v2_static(filename):
+    return send_from_directory(str(BASE_DIR / "v2" / "static"), filename)
+
+
 @app.route("/api/has-api-key")
 def has_api_key():
     return jsonify({"has_key": bool(os.environ.get("ANTHROPIC_API_KEY", ""))})
