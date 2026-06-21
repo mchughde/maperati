@@ -8,6 +8,43 @@ map.on('load', () => {
   renderAddStopModeRow();
 });
 
+// ── TEMPORARY on-screen debug overlay for Apple Pencil ─────
+// Shows what input events the iPad actually sends when you touch the map,
+// so we can diagnose without any developer tools. REMOVE once drawing works.
+{
+  const box = document.createElement('div');
+  box.id = 'pencilDebug';
+  box.style.cssText =
+    'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:99999;' +
+    'background:rgba(0,0,0,0.85);color:#3f6;font:13px/1.4 monospace;padding:9px 12px;' +
+    'border-radius:8px;max-width:94vw;white-space:pre-wrap;pointer-events:none';
+  box.textContent = 'DEBUG ready — turn on Draw, then tap the map';
+  document.body.appendChild(box);
+
+  const lines = [];
+  window._pdlog = (msg) => {
+    const t = new Date().toTimeString().slice(0, 8);
+    lines.unshift(t + '  ' + msg);
+    if (lines.length > 9) lines.pop();
+    box.textContent = lines.join('\n');
+  };
+
+  const c = map.getCanvas();
+  c.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    window._pdlog(`touchstart  n=${e.touches.length}  touchType=${t ? (t.touchType || 'none') : '-'}`);
+  }, { passive: true });
+  c.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    window._pdlog(`touchend    touchType=${t ? (t.touchType || 'none') : '-'}`);
+  }, { passive: true });
+  c.addEventListener('pointerdown',   (e) => window._pdlog(`pointerdown pointerType=${e.pointerType}`), { passive: true });
+  c.addEventListener('pointerup',     (e) => window._pdlog(`pointerup   pointerType=${e.pointerType}`), { passive: true });
+  c.addEventListener('pointercancel', (e) => window._pdlog(`pointercancel pointerType=${e.pointerType}`), { passive: true });
+
+  map.on('click', () => window._pdlog(`>> MapLibre CLICK   drawing=${drawing}`));
+}
+
 // Apple Pencil support for MapLibre GL JS on Safari/iPadOS
 // Two-path approach: Safari fires TouchEvents with touchType:"stylus" AND/OR
 // PointerEvents with pointerType:"pen" for Apple Pencil. clickTolerance:15 (in
@@ -25,6 +62,7 @@ map.on('load', () => {
     const y = clientY - rect.top;
     const lngLat = map.unproject([x, y]);
     _pencilTapPending = true;
+    if (window._pdlog) window._pdlog(`** PENCIL handler fired -> onMapClick (drawing=${drawing})`);
     hideCtx(); closeEditDropdown(); closeDrawDropdown();
     onMapClick({ lngLat, originalEvent, point: { x, y } });
   }

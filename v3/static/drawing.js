@@ -154,6 +154,7 @@ function stopDrawFromMenu() {
 }
 
 async function addRoutePoint(lat, lng) {
+  if (window._pdlog) window._pdlog(`++ addRoutePoint(${lat.toFixed(5)}, ${lng.toFixed(5)})`);
   const prev = routeCoords.length ? routeCoords[routeCoords.length-1] : null;
   let newCoords = [[lat, lng]];
   let segDist = 0;
