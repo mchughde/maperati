@@ -238,6 +238,9 @@ function renderStops() {
     item.addEventListener("dragover",  onDragOver);
     item.addEventListener("drop",      onDrop);
     item.addEventListener("dragend",   onDragEnd);
+    item.addEventListener("touchstart", onTouchDragStart, { passive: false });
+    item.addEventListener("touchmove",  onTouchDragMove,  { passive: false });
+    item.addEventListener("touchend",   onTouchDragEnd);
     list.appendChild(item);
 
     const hasNumbered = selectedStops.some(s => !s.category);
@@ -360,7 +363,7 @@ function startEditNote(i) {
   });
 }
 
-// ── Drag to reorder ───────────────────────────────────────
+// ── Drag to reorder (mouse) ───────────────────────────────
 
 let dragSrc = null;
 function onDragStart(e) { dragSrc = this; this.classList.add("dragging"); }
@@ -376,6 +379,49 @@ function onDrop(e) {
 }
 function onDragEnd() {
   document.querySelectorAll(".stop-item").forEach(el => el.classList.remove("dragging","drag-over"));
+}
+
+// ── Drag to reorder (touch) ───────────────────────────────
+
+let _touchDragSrc = null;
+let _touchDragOver = null;
+
+function onTouchDragStart(e) {
+  if (!e.target.closest('.stop-drag-handle')) return;
+  e.preventDefault();
+  _touchDragSrc = this;
+  this.classList.add('dragging');
+}
+
+function onTouchDragMove(e) {
+  if (!_touchDragSrc) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const item = el && el.closest('.stop-item');
+  if (_touchDragOver && _touchDragOver !== item) _touchDragOver.classList.remove('drag-over');
+  if (item && item !== _touchDragSrc) {
+    _touchDragOver = item;
+    item.classList.add('drag-over');
+  } else if (!item || item === _touchDragSrc) {
+    _touchDragOver = null;
+  }
+}
+
+function onTouchDragEnd() {
+  if (!_touchDragSrc) return;
+  const from = parseInt(_touchDragSrc.dataset.idx);
+  const to   = _touchDragOver ? parseInt(_touchDragOver.dataset.idx) : -1;
+  _touchDragSrc.classList.remove('dragging');
+  if (_touchDragOver) _touchDragOver.classList.remove('drag-over');
+  _touchDragSrc = null;
+  _touchDragOver = null;
+  if (to >= 0 && from !== to) {
+    pushUndo();
+    const [moved] = selectedStops.splice(from, 1);
+    selectedStops.splice(to, 0, moved);
+    renderStops();
+  }
 }
 
 // ── Stop ordering helpers ─────────────────────────────────
