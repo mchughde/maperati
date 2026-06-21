@@ -75,19 +75,14 @@ map.on('load', () => {
       );
     }
   };
-  const _endStroke = () => {
-    map.dragPan.enable();
-    if (map.dragRotate) map.dragRotate.enable();
-  };
 
   _canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'pen') return;
     _penDown = { x: e.clientX, y: e.clientY, time: Date.now() };
 
     if (drawing && drawMode === 'free') {
-      // Take over panning for this stroke; finger pan resumes on pointerup.
-      map.dragPan.disable();
-      if (map.dragRotate) map.dragRotate.disable();
+      // One-finger pan is already disabled for the whole Free-mode session
+      // (see syncPenPanState in drawing.js), so we just collect the stroke.
       hideCtx(); closeEditDropdown(); closeDrawDropdown();
       pushUndo();
       const [x, y] = _xy(e.clientX, e.clientY);
@@ -116,7 +111,6 @@ map.on('load', () => {
 
     // Finalise a freehand stroke (Free mode)
     if (_penStroke) {
-      _endStroke();
       routeSegments.push(_penStroke.count);  // whole stroke = one undo step
       dotMarkers.push(null);
       routeDistM = calcDist(routeCoords);
@@ -152,9 +146,13 @@ map.on('load', () => {
   _canvas.addEventListener('pointercancel', (e) => {
     if (e.pointerType !== 'pen') return;
     if (_penStroke) {
-      _endStroke();
+      // Salvage whatever was drawn before the OS cancelled the stroke.
+      routeSegments.push(_penStroke.count);
+      dotMarkers.push(null);
+      routeDistM = calcDist(routeCoords);
       _penStroke = null;
       redrawRoute();
+      updateRouteStats();
     }
     _penDown = null;
   }, { passive: true });

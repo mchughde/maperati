@@ -118,9 +118,21 @@ function toggleDraw() {
     const mapClickBtn = document.getElementById("mapClickBtn");
     if (mapClickBtn) { mapClickBtn.disabled = false; mapClickBtn.title = ""; }
   }
+  syncPenPanState();
 }
 
-function setDrawMode(mode) { drawMode = mode; }
+function setDrawMode(mode) { drawMode = mode; syncPenPanState(); }
+
+// Apple Pencil freehand needs MapLibre's one-finger drag-pan OFF for the whole
+// time Free draw mode is active. Toggling it per-stroke (as we tried first) can
+// wedge MapLibre's gesture handlers mid-gesture and freeze the map — especially
+// when a palm/finger is also touching. So we flip it once on mode change only.
+// Two-finger pan/pinch is untouched, so the map can still be moved while drawing.
+function syncPenPanState() {
+  if (!map || !map.dragPan) return;
+  if (drawing && drawMode === 'free') map.dragPan.disable();
+  else map.dragPan.enable();
+}
 
 function toggleDrawDropdown() {
   const dd = document.getElementById("drawDropdown");
