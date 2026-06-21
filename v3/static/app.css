@@ -1,0 +1,397 @@
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --a:#2563EB;--a2:#5B9CFF;--a3:#EBF3FF;
+  --blue:#2563EB;
+  --bg:#F5F8FF;--surface:#fff;--border:#D0E3FF;
+  --text:#1A1D2E;--sub:#6878A0;--danger:#DC2626;
+  --r:9px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── Header ── */
+header{background:#fff;padding:0 14px;height:54px;display:flex;align-items:center;gap:8px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.hbtn-icon{background:none;border:none;color:#666;cursor:pointer;padding:7px;border-radius:8px;font-size:1.05rem;display:flex;align-items:center;justify-content:center;transition:background 0.13s;flex-shrink:0}
+.hbtn-icon:hover{background:#f3f0ec}
+.header-logo{width:26px;height:26px;background:var(--a);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+header h1{font-size:1.4rem;font-weight:700;letter-spacing:-0.03em;color:#1A1614}
+header .spacer{flex:1}
+.hbtn{background:var(--a);border:none;color:#fff;padding:7px 15px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:opacity 0.15s;letter-spacing:-0.01em}
+.hbtn:hover{opacity:0.85}
+.hbtn-outline{background:#fff;border:1.5px solid var(--a);color:var(--a)}
+.hbtn-outline:hover{opacity:1;background:#EEF4FF}
+.hbtn-outline.active{background:#EEF4FF}
+#snapIndicator{display:none}
+
+/* ── Layout ── */
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:300px;min-width:0;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width 0.22s cubic-bezier(.4,0,.2,1)}
+.sidebar.collapsed{width:0}
+#map{flex:1;height:100%}
+
+/* ── Sidebar sections ── */
+.section{border-bottom:1px solid var(--border);flex-shrink:0}
+.section-header{padding:10px 16px;display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:0.76rem;font-weight:600;color:#4B4542}
+.section-header:hover{background:#faf8f6}
+.section-header .toggle{margin-left:auto;font-size:0.58rem;color:#C8BCB4;transition:transform 0.18s}
+.section-header.open .toggle{transform:rotate(180deg)}
+.section-body{padding:14px 16px;display:none}
+.section-body.open{display:block}
+
+/* ── Stop list ── */
+.stop-scroll{flex:1;overflow-y:auto;min-height:0}
+.stop-item{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid #f0ebe6;cursor:grab}
+.stop-item:hover{background:#faf8f6}
+.stop-item.dragging{opacity:0.35}
+.stop-item.drag-over{border-top:2px solid var(--a)}
+.stop-num{width:22px;height:22px;border-radius:50%;background:#1A1D2E;color:#fff;font-size:0.66rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── Add-stop popup (MapLibre) ── */
+.add-stop-popup .maplibregl-popup-content{border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.13);padding:14px;min-width:220px}
+.add-stop-popup .maplibregl-popup-close-button{width:26px !important;height:26px !important;font-size:1.2rem !important;font-weight:700 !important;color:#4B4542 !important;top:8px !important;right:8px !important;border-radius:6px !important;line-height:26px !important;text-align:center !important;padding:0 !important;background:none;border:none;cursor:pointer;position:absolute}
+.add-stop-popup .maplibregl-popup-close-button:hover{background:#f0ebe6 !important;color:#1A1D2E !important}
+.add-stop-popup .maplibregl-popup-tip{display:none}
+
+/* ── Route distance popup ── */
+.route-dist-popup .maplibregl-popup-content{border-radius:10px;box-shadow:0 3px 14px rgba(0,0,0,0.15);padding:8px 14px;font-size:0.78rem;font-weight:600;color:#1A1D2E;white-space:nowrap}
+.route-dist-popup .maplibregl-popup-tip{display:none}
+.rdp-to{color:#6878A0;font-weight:400}
+.rdp-sep{color:#D0E3FF}
+
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1A1D2E;color:#fff;padding:10px 18px;border-radius:10px;font-size:0.78rem;font-weight:500;z-index:3000;box-shadow:0 4px 16px rgba(0,0,0,0.2);max-width:340px;text-align:center;opacity:0;transition:opacity 0.25s;pointer-events:none}
+.stop-route-btn{background:none;border:none;padding:0;margin-top:3px;font-size:0.68rem;font-weight:600;color:#2563EB;cursor:pointer;font-family:inherit;display:inline-block}
+.stop-route-btn:hover{text-decoration:underline}
+.stop-route-btn:disabled{opacity:0.5;cursor:not-allowed;text-decoration:none}
+.stop-name{flex:1;font-size:0.81rem;line-height:1.35;font-weight:500;color:#1A1614}
+.stop-coords{font-size:0.65rem;color:var(--sub)}
+.stop-remove{background:none;border:none;color:#C8BCB4;cursor:pointer;font-size:0.85rem;padding:6px 8px;border-radius:5px;line-height:1}
+.stop-remove:hover{color:var(--danger);background:#fef2f2}
+.stop-rename{background:none;border:none;color:#6878A0;cursor:pointer;font-size:0.85rem;padding:6px 8px;border-radius:5px;line-height:1}
+.stop-rename:hover{color:var(--a);background:#EBF3FF}
+.stop-role-dd{position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:4px;min-width:140px;z-index:2000}
+.role-item{display:block;width:100%;padding:7px 12px;border:none;border-radius:7px;background:none;font-size:0.77rem;font-weight:500;color:#1A1D2E;cursor:pointer;font-family:inherit;text-align:left}
+.role-item:hover{background:#F5F8FF}
+.role-item-divider{height:1px;background:#E5E7EB;margin:4px 8px}
+.cat-picker-label{font-size:0.65rem;color:#9ca3af;padding:4px 12px 2px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
+.cat-option{display:flex;align-items:center;gap:7px}
+.mode-btn{border-radius:7px;border:1.5px solid transparent;background:none;cursor:pointer;padding:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:border-color 0.15s,background 0.15s;width:100%}
+.mode-btn:hover{border-color:#D0E3FF;background:#f5f8ff}
+.mode-btn.active{border-color:#2563EB;background:#EBF3FF}
+.mode-btn-icon{display:flex;align-items:center;justify-content:center}
+.mode-btn-label{font-size:9px;color:#6878A0;line-height:1;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.mode-btn.active .mode-btn-label{color:#2563EB}
+.stop-drag-handle{color:#9ca3af;font-size:1rem;cursor:grab;flex-shrink:0;line-height:1;padding:0 2px}
+.stop-drag-handle:hover{color:#6b7280}
+.empty-state{padding:28px 14px;text-align:center;color:#C0B5AE;font-size:0.8rem;line-height:1.75}
+
+/* ── Form ── */
+label{display:block;font-size:0.71rem;font-weight:600;color:var(--sub);margin-bottom:4px}
+input[type=text],input[type=search],select,textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r);font-size:0.82rem;font-family:inherit;background:#faf8f6;color:var(--text);transition:border-color 0.15s,box-shadow 0.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--a2);background:#fff;box-shadow:0 0 0 3px rgba(58,134,255,0.12)}
+.form-row{margin-bottom:10px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border:none;border-radius:var(--r);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.13s;font-family:inherit}
+.btn:disabled{opacity:0.38;cursor:not-allowed}
+.btn-primary{background:var(--a);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--a2)}
+.btn-secondary{background:#F0EBE6;color:#4B4542}
+.btn-secondary:hover:not(:disabled){background:#E8E0D8}
+.btn-secondary.active{background:var(--a);color:#fff}
+.btn-warning{background:#F0EBE6;color:#4B4542}
+.btn-warning.active{background:var(--a);color:#fff}
+.btn-danger{background:#fef2f2;color:#991b1b}
+.btn-danger:hover:not(:disabled){background:#fee2e2}
+.btn-sm{padding:5px 10px;font-size:0.72rem}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.btn-block{width:100%;justify-content:center}
+
+/* ── Status messages ── */
+.msg{font-size:0.77rem;padding:8px 10px;border-radius:8px;margin-top:6px;line-height:1.45}
+.msg.info{background:#EBF3FF;color:#1a3a7a;border:1px solid #BDD6FF}
+.msg.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.msg.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.spinner{display:inline-block;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── File drop ── */
+.drop-zone{border:1.5px dashed #D4C5BA;border-radius:12px;padding:20px 14px;text-align:center;color:#A8988E;font-size:0.8rem;cursor:pointer;transition:all 0.18s;background:#faf8f6}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--a2);background:var(--a3);color:var(--a)}
+.drop-zone input{display:none}
+.drop-zone strong{display:block;margin-top:4px;color:var(--a);font-size:0.77rem;font-weight:600}
+
+/* ── Geocode results ── */
+.geo-results{position:absolute;background:#fff;border:1.5px solid var(--border);border-radius:var(--r);box-shadow:0 6px 20px rgba(0,0,0,0.1);z-index:1000;width:100%;max-height:180px;overflow-y:auto;font-size:0.8rem}
+.geo-result{padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0ebe6}
+.geo-result:hover{background:#faf8f6}
+.geo-result:last-child{border-bottom:none}
+.geo-input-wrap{position:relative}
+
+/* ── Export ── */
+.export-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+
+/* ── Floating toolbar — bottom centre ── */
+#drawToolbar{
+  position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;align-items:center;gap:3px;
+  background:#fff;border-radius:40px;
+  box-shadow:0 4px 22px rgba(0,0,0,0.13);
+  padding:5px 9px;
+}
+.tb-btn{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:7px 13px;border:none;border-radius:20px;
+  font-size:0.75rem;font-weight:600;cursor:pointer;font-family:inherit;
+  background:transparent;color:#4B4542;white-space:nowrap;
+  transition:background 0.13s,color 0.13s;
+}
+.tb-btn:hover{background:#F0EBE6}
+.tb-btn.active{background:var(--text);color:#fff}
+.tb-btn.erase-active{background:#D97706;color:#fff}
+.tb-divider{width:1px;height:22px;background:#D0E3FF;margin:0 3px}
+
+/* ── Draw dropdown ── */
+#drawDropdown{
+  position:absolute;bottom:calc(100% + 8px);left:0;
+  z-index:1001;background:#fff;border-radius:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.14);
+  padding:5px;display:none;min-width:175px;
+}
+
+/* ── Edit dropdown ── */
+#editDropdown{
+  position:absolute;bottom:calc(100% + 8px);right:0;
+  z-index:1001;background:#fff;border-radius:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.14);
+  padding:5px;display:none;min-width:180px;
+}
+.edit-item{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:500;color:#4B4542;border:none;background:none;width:100%;font-family:inherit;text-align:left}
+.edit-item:hover{background:#F0EBE6}
+.edit-item.danger{color:var(--danger)}
+.edit-item.danger:hover{background:#fef2f2}
+.edit-item:disabled{opacity:0.38;cursor:not-allowed}
+
+/* ── Route stats — top centre ── */
+#mapTopBar{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+#routeStats{
+  background:#fff;border-radius:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.1);
+  padding:6px 18px;font-size:0.8rem;font-weight:600;
+  display:none;white-space:nowrap;color:var(--text);
+}
+#routeStats strong{color:var(--blue)}
+#modeBar{position:relative}
+#modeBarBtn{
+  background:#fff;border:none;cursor:pointer;
+  border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,0.1);
+  padding:6px 14px;font-size:0.75rem;font-weight:600;color:#2563EB;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  white-space:nowrap;transition:background 0.15s;
+}
+#modeBarBtn:hover{background:#EBF3FF}
+#modeDropdown{
+  display:none;position:absolute;top:calc(100% + 6px);left:50%;
+  transform:translateX(-50%);
+  background:#fff;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  padding:4px;min-width:110px;z-index:1100;
+}
+#modeDropdown.open{display:block}
+.mode-bar-opt{
+  display:block;width:100%;border:none;background:none;cursor:pointer;
+  padding:7px 14px;border-radius:7px;text-align:center;
+  font-size:0.75rem;font-weight:600;color:#4B4542;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  transition:background 0.13s,color 0.13s;
+}
+.mode-bar-opt:hover{background:#f5f8ff;color:#2563EB}
+.mode-bar-opt.active{color:#2563EB;background:#EBF3FF}
+
+/* ── Dataset info ── */
+.data-info{font-size:0.71rem;color:var(--sub);margin-top:5px}
+.col-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.col-tag{background:#F0EBE6;border-radius:5px;padding:2px 7px;font-size:0.65rem;color:var(--sub)}
+
+/* ── Misc ── */
+#arrFilter{display:none}
+
+/* ── Elevation panel ── */
+#elevationPanel{display:none;flex-shrink:0;background:#fff;border-top:1px solid var(--border);height:140px;overflow:hidden}
+.elev-header{display:flex;align-items:center;justify-content:space-between;padding:7px 14px 4px}
+.elev-header span:first-child{font-size:0.72rem;font-weight:600;color:#4B4542}
+.elev-stats{font-size:0.72rem;color:#6878A0}
+.elev-close{background:none;border:none;color:#C8BCB4;cursor:pointer;font-size:0.9rem;padding:2px 4px;border-radius:4px;line-height:1}
+.elev-close:hover{color:var(--danger);background:#fef2f2}
+.elev-body{display:flex;padding:0 14px 8px;gap:6px;align-items:stretch}
+.elev-y{display:flex;flex-direction:column;justify-content:space-between;width:32px;text-align:right;font-size:0.65rem;color:#6878A0;padding-bottom:16px}
+.elev-chart{flex:1;position:relative}
+.elev-chart svg{width:100%;height:80px;display:block}
+.elev-x{position:relative;height:16px;font-size:0.65rem;color:#6878A0;margin-top:2px}
+
+/* ── Full screen mode ── */
+#fullscreenExit{
+  display:none;position:fixed;top:90px;left:12px;z-index:4000;
+  background:#fff;border:1.5px solid var(--border);border-radius:8px;
+  padding:6px 13px;font-size:0.75rem;font-weight:600;color:#4B4542;
+  cursor:pointer;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,0.12);
+  transition:background 0.13s;
+}
+#fullscreenExit:hover{background:#F0EBE6}
+body.fullscreen header{display:none}
+body.fullscreen .sidebar{width:0}
+body.fullscreen #fullscreenExit{display:block}
+
+/* ── Stop notes ── */
+.stop-note-wrap{margin-top:3px}
+.stop-note-text{font-size:0.65rem;color:#4B4542;font-style:italic;cursor:pointer;line-height:1.45;display:block;word-break:break-word}
+.stop-note-text:hover{color:var(--a)}
+.stop-note-add{background:none;border:none;color:#C8BCB4;font-size:0.65rem;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline dotted;line-height:1.45}
+.stop-note-add:hover{color:var(--sub)}
+
+/* ── Stop-to-stop route connector ── */
+.stop-connector{padding:1px 14px 1px 46px;display:flex;align-items:center;border-bottom:1px solid #f0ebe6}
+
+/* ── OSM Discover section ── */
+.osm-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.osm-cat-btn{padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:#fff;font-size:0.72rem;font-weight:600;color:#4B4542;cursor:pointer;font-family:inherit;text-align:left;transition:all 0.13s}
+.osm-cat-btn:hover{background:var(--a3);border-color:var(--a);color:var(--a)}
+.osm-cat-btn.active{background:var(--a);border-color:var(--a);color:#fff}
+
+/* ── MapLibre GL overrides ── */
+.maplibregl-ctrl-group{box-shadow:0 2px 8px rgba(0,0,0,0.09)!important;border:1.5px solid var(--border)!important;border-radius:8px!important}
+.maplibregl-ctrl-group button{border-radius:6px!important}
+.maplibregl-popup-content{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif!important;font-size:0.78rem!important;padding:8px 14px!important;border-radius:10px!important;box-shadow:0 3px 14px rgba(0,0,0,0.15)!important}
+.maplibregl-popup-tip{display:none}
+
+/* ── Resolution picker ── */
+.res-btn{flex:1;padding:3px 0;font-size:0.72rem;font-family:inherit;border:1.5px solid #D0E3FF;border-radius:6px;background:#fff;color:#6878A0;cursor:pointer;transition:background 0.1s}
+.res-btn-active{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600}
+
+/* ── Print ── */
+@media print {
+  header,
+  .sidebar,
+  #drawToolbar,
+  #mapTopBar,
+  #toast,
+  #fullscreenExit,
+  #elevationPanel,
+  #printBtn,
+  .maplibregl-ctrl-container { display: none !important; }
+  html, body { overflow: hidden !important; height: 100vh !important; }
+  .main { height: 100vh; overflow: hidden; }
+  #map { height: 100vh; }
+  @page { margin: 0; }
+}
+
+/* ── Mobile / iPad responsive ────────────────────────────────────────────── */
+/* Sidebar backdrop — hidden by default, shown on mobile when sidebar is open */
+#sidebarBackdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 900;
+}
+
+@media (max-width: 900px) {
+  /* Sidebar becomes a full-height overlay instead of shrinking the map */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 300px;
+    z-index: 1000;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    transform: translateX(0);
+    transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  }
+  .sidebar.collapsed {
+    width: 300px;      /* override desktop width:0 — use transform instead */
+    transform: translateX(-310px);
+  }
+  /* Show backdrop when sidebar is open on mobile */
+  .sidebar:not(.collapsed) ~ #sidebarBackdrop {
+    display: block;
+  }
+
+  /* Larger touch targets across the board */
+  .hbtn, .hbtn-outline {
+    padding: 10px 16px;
+    font-size: 0.82rem;
+  }
+  .hbtn-icon {
+    padding: 10px;
+    font-size: 1.1rem;
+  }
+  .btn {
+    min-height: 44px;
+    font-size: 0.82rem;
+  }
+  .btn-sm {
+    min-height: 38px;
+  }
+  .tb-btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 0.84rem;
+  }
+  .edit-item {
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 0.84rem;
+  }
+  .osm-cat-btn {
+    min-height: 44px;
+  }
+  .stop-remove, .stop-rename {
+    padding: 10px;
+    font-size: 1rem;
+  }
+  .role-item {
+    min-height: 44px;
+    padding: 12px 14px;
+    font-size: 0.84rem;
+  }
+  .stop-route-btn {
+    font-size: 0.78rem;
+    padding: 6px 0;
+  }
+
+  /* Header — allow wrapping on very narrow screens */
+  header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 54px;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  header h1 {
+    font-size: 1.2rem;
+  }
+
+  /* Elevation panel — shorter on tablet to leave map visible */
+  #elevationPanel {
+    max-height: 160px;
+  }
+
+  /* Draw toolbar — slightly larger for fat fingers */
+  #drawToolbar {
+    bottom: 18px;
+  }
+
+  /* Export dropdown — cap width so it doesn't overflow screen edge */
+  #exportDropdown {
+    right: 0 !important;
+    max-width: calc(100vw - 20px);
+  }
+
+  /* Route stats bar — allow wrapping */
+  #mapTopBar {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
