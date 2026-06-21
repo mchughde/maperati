@@ -123,15 +123,12 @@ function toggleDraw() {
 
 function setDrawMode(mode) { drawMode = mode; syncPenPanState(); }
 
-// Apple Pencil freehand needs MapLibre's one-finger drag-pan OFF for the whole
-// time Free draw mode is active. Toggling it per-stroke (as we tried first) can
-// wedge MapLibre's gesture handlers mid-gesture and freeze the map — especially
-// when a palm/finger is also touching. So we flip it once on mode change only.
-// Two-finger pan/pinch is untouched, so the map can still be moved while drawing.
+// Free-mode freehand drawing is handled by a transparent overlay layer on top
+// of the map (built in init.js), NOT by toggling MapLibre's pan handlers.
+// Toggling dragPan froze the map and made Safari cancel touches; the overlay
+// owns input only while Free mode is active and avoids both problems entirely.
 function syncPenPanState() {
-  if (!map || !map.dragPan) return;
-  if (drawing && drawMode === 'free') map.dragPan.disable();
-  else map.dragPan.enable();
+  if (typeof syncFreeDrawOverlay === 'function') syncFreeDrawOverlay();
 }
 
 function toggleDrawDropdown() {

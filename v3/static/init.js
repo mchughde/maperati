@@ -45,122 +45,126 @@ map.on('load', () => {
   map.on('click', () => window._pdlog(`>> MapLibre CLICK   drawing=${drawing}`));
 }
 
-// Apple Pencil support for MapLibre GL JS on Safari/iPadOS.
-// Safari fires reliable PointerEvents with pointerType:"pen" for the Pencil
-// (confirmed on-device), so we drive everything off those.
-//
-//   Free mode  : a pen DRAG draws a continuous freehand line. We disable the
-//                map's drag-pan only for the duration of the stroke, so a
-//                FINGER can still pan/zoom the map while the Pencil draws.
-//   Snap mode  : a pen TAP drops a road-snapped point (drag pans, as normal).
-//   Any mode   : a pen TAP is routed through onMapClick so add-stop / erase /
-//                bbox / print-area modes keep working with the Pencil.
+// ── Free-mode freehand drawing surface ────────────────────
+// A transparent layer sits on top of the map and becomes "live" only while
+// Free draw mode is active. While live it owns all pointer input (pen AND
+// finger) with touch-action:none, so strokes never collide with MapLibre's
+// pan/zoom — which previously caused the map to freeze and Safari to cancel
+// touches. In Snap mode (or when not drawing) it's inert (pointer-events:none)
+// and MapLibre handles taps and panning normally.
 {
-  const _canvas = map.getCanvas();
-  let _penStroke = null;   // active freehand stroke: {lastClient:[x,y], count}
-  let _penDown   = null;   // pen-down marker for tap detection: {x,y,time}
-  let _penUpAt   = 0;      // timestamp of last handled pen-up (dedups native click)
-  const MIN_PX   = 5;      // min pixel travel between sampled freehand points
-  const TAP_MS   = 600;    // max contact time still counted as a tap
-  const TAP_PX   = 15;     // max travel still counted as a tap
+  const _canvas  = map.getCanvas();
+  const _overlay = document.createElement('div');
+  _overlay.id = 'freeDrawLayer';
+  _overlay.style.cssText =
+    'position:absolute;inset:0;touch-action:none;pointer-events:none;' +
+    'background:transparent;cursor:crosshair;z-index:1';
+  map.getCanvasContainer().appendChild(_overlay);
 
-  const _xy = (clientX, clientY) => {
-    const r = _canvas.getBoundingClientRect();
-    return [clientX - r.left, clientY - r.top];
+  let _stroke   = null;   // active stroke: { count }
+  let _activeId = null;   // pointerId currently drawing (ignore extra fingers)
+  let _last     = [0, 0]; // last sampled client position
+  const MIN_PX  = 4;      // min pixel travel between sampled points
+
+  // Toggled by syncPenPanState() (drawing.js) on every draw / mode change.
+  window.syncFreeDrawOverlay = () => {
+    const active = drawing && drawMode === 'free';
+    _overlay.style.pointerEvents = active ? 'auto' : 'none';
+    if (!active) { _stroke = null; _activeId = null; }
   };
-  const _liveRoute = () => {
+
+  const _unproj = (cx, cy) => {
+    const r = _canvas.getBoundingClientRect();
+    return map.unproject([cx - r.left, cy - r.top]);
+  };
+  const _live = () => {
     if (map.getSource('route')) {
       map.getSource('route').setData(
         routeCoords.length > 1 ? routeCoordsToGeoJSON(routeCoords) : emptyCollection()
       );
     }
   };
+  const _finish = () => {
+    if (!_stroke) { _activeId = null; return; }
+    routeSegments.push(_stroke.count);   // whole stroke = one undo step
+    dotMarkers.push(null);
+    routeDistM = calcDist(routeCoords);
+    const n = _stroke.count;
+    _stroke = null; _activeId = null;
+    redrawRoute();
+    updateRouteStats();
+    document.getElementById('editMenuBtn').style.display = 'flex';
+    document.getElementById('editDivider').style.display = 'block';
+    if (window._pdlog) window._pdlog(`stroke done — ${n} pts`);
+  };
+
+  _overlay.addEventListener('pointerdown', (e) => {
+    if (_activeId !== null) return;          // already drawing with another pointer
+    _activeId = e.pointerId;
+    if (_overlay.setPointerCapture) _overlay.setPointerCapture(e.pointerId);
+    _last = [e.clientX, e.clientY];
+    hideCtx(); closeEditDropdown(); closeDrawDropdown();
+    pushUndo();
+    const ll = _unproj(e.clientX, e.clientY);
+    routeCoords.push([ll.lat, ll.lng]);
+    _stroke = { count: 1 };
+    _live();
+    if (window._pdlog) window._pdlog(`draw start (${e.pointerType})`);
+  });
+
+  _overlay.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== _activeId || !_stroke) return;
+    if (Math.hypot(e.clientX - _last[0], e.clientY - _last[1]) < MIN_PX) return;
+    _last = [e.clientX, e.clientY];
+    const ll = _unproj(e.clientX, e.clientY);
+    routeCoords.push([ll.lat, ll.lng]);
+    _stroke.count++;
+    _live();
+  });
+
+  _overlay.addEventListener('pointerup',     (e) => { if (e.pointerId === _activeId) _finish(); });
+  _overlay.addEventListener('pointercancel', (e) => { if (e.pointerId === _activeId) _finish(); });
+}
+
+// ── Pen taps in Snap / erase / add-stop modes ─────────────
+// Free mode is handled by the overlay above. Here we only convert a quick
+// Apple Pencil tap into an onMapClick, because MapLibre doesn't reliably
+// synthesise a native click for the Pencil. A pen DRAG is left to MapLibre,
+// which pans the map as usual.
+{
+  const _canvas = map.getCanvas();
+  let _down = null;
+  let _upAt = 0;
+  const TAP_MS = 600, TAP_PX = 15;
 
   _canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'pen') return;
-    _penDown = { x: e.clientX, y: e.clientY, time: Date.now() };
-
-    if (drawing && drawMode === 'free') {
-      // One-finger pan is already disabled for the whole Free-mode session
-      // (see syncPenPanState in drawing.js), so we just collect the stroke.
-      hideCtx(); closeEditDropdown(); closeDrawDropdown();
-      pushUndo();
-      const [x, y] = _xy(e.clientX, e.clientY);
-      const ll = map.unproject([x, y]);
-      routeCoords.push([ll.lat, ll.lng]);
-      _penStroke = { lastClient: [e.clientX, e.clientY], count: 1 };
-      _liveRoute();
-      if (window._pdlog) window._pdlog('pen DOWN (free) — stroke start');
-    }
-  }, { passive: true });
-
-  _canvas.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'pen' || !_penStroke) return;
-    const [lx, ly] = _penStroke.lastClient;
-    if (Math.hypot(e.clientX - lx, e.clientY - ly) < MIN_PX) return;
-    _penStroke.lastClient = [e.clientX, e.clientY];
-    const [x, y] = _xy(e.clientX, e.clientY);
-    const ll = map.unproject([x, y]);
-    routeCoords.push([ll.lat, ll.lng]);
-    _penStroke.count++;
-    _liveRoute();
+    if (drawing && drawMode === 'free') return;   // overlay owns Free mode
+    _down = { x: e.clientX, y: e.clientY, time: Date.now() };
   }, { passive: true });
 
   _canvas.addEventListener('pointerup', (e) => {
-    if (e.pointerType !== 'pen') return;
-
-    // Finalise a freehand stroke (Free mode)
-    if (_penStroke) {
-      routeSegments.push(_penStroke.count);  // whole stroke = one undo step
-      dotMarkers.push(null);
-      routeDistM = calcDist(routeCoords);
-      const n = _penStroke.count;
-      _penStroke = null;
-      _penDown = null;
-      _penUpAt = Date.now();
-      redrawRoute();
-      updateRouteStats();
-      document.getElementById('editMenuBtn').style.display = 'flex';
-      document.getElementById('editDivider').style.display = 'block';
-      if (window._pdlog) window._pdlog(`pen UP — stroke ${n} pts`);
-      return;
-    }
-
-    // Otherwise: was it a tap? (Snap mode point, add-stop, erase, bbox, etc.)
-    if (_penDown) {
-      const dt = Date.now() - _penDown.time;
-      const moved = Math.hypot(e.clientX - _penDown.x, e.clientY - _penDown.y);
-      _penDown = null;
-      if (dt <= TAP_MS && moved <= TAP_PX) {
-        _penUpAt = Date.now();
-        const [x, y] = _xy(e.clientX, e.clientY);
-        const lngLat = map.unproject([x, y]);
-        hideCtx(); closeEditDropdown(); closeDrawDropdown();
-        if (window._pdlog) window._pdlog(`pen TAP -> onMapClick (drawing=${drawing})`);
-        onMapClick({ lngLat, originalEvent: e, point: { x, y } });
-      }
-      // else: it was a drag — MapLibre already panned; nothing to do.
-    }
+    if (e.pointerType !== 'pen' || !_down) return;
+    const dt = Date.now() - _down.time;
+    const moved = Math.hypot(e.clientX - _down.x, e.clientY - _down.y);
+    _down = null;
+    if (dt > TAP_MS || moved > TAP_PX) return;     // a drag — let MapLibre pan
+    _upAt = Date.now();
+    const r = _canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const lngLat = map.unproject([x, y]);
+    hideCtx(); closeEditDropdown(); closeDrawDropdown();
+    if (window._pdlog) window._pdlog(`pen TAP -> onMapClick (drawing=${drawing})`);
+    onMapClick({ lngLat, originalEvent: e, point: { x, y } });
   }, { passive: true });
 
   _canvas.addEventListener('pointercancel', (e) => {
-    if (e.pointerType !== 'pen') return;
-    if (_penStroke) {
-      // Salvage whatever was drawn before the OS cancelled the stroke.
-      routeSegments.push(_penStroke.count);
-      dotMarkers.push(null);
-      routeDistM = calcDist(routeCoords);
-      _penStroke = null;
-      redrawRoute();
-      updateRouteStats();
-    }
-    _penDown = null;
+    if (e.pointerType === 'pen') _down = null;
   }, { passive: true });
 
-  // Native click (finger / mouse). Skip if we just handled a pen up, so a
-  // synthetic click can't double-add a point.
+  // Native click (finger / mouse). Skip just after a pen tap to avoid double-add.
   map.on('click', (e) => {
-    if (Date.now() - _penUpAt < 700) return;
+    if (Date.now() - _upAt < 700) return;
     onMapClick(e);
   });
 }
