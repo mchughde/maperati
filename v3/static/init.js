@@ -8,37 +8,66 @@ map.on('load', () => {
   renderAddStopModeRow();
 });
 
-// Apple Pencil support for MapLibre GL JS
-// MapLibre calls preventDefault() on pointerdown for drag handling, which suppresses
-// the browser's synthetic click after a short pencil tap. Detect taps via pointerup
-// and call onMapClick directly. Guard against double-fire if click does propagate.
+// Apple Pencil support for MapLibre GL JS on Safari/iPadOS
+// Two-path approach: Safari fires TouchEvents with touchType:"stylus" AND/OR
+// PointerEvents with pointerType:"pen" for Apple Pencil. clickTolerance:15 (in
+// map-init.js) widens MapLibre's tap window, but we also intercept directly here
+// in case the native click is still suppressed by drag capture.
+// _pencilTapPending guards against double-fire if both paths trigger.
 {
-  let _pencilDown = null;
+  let _tapStart = null;
   let _pencilTapPending = false;
   const _canvas = map.getCanvas();
 
+  function _firePencilClick(clientX, clientY, originalEvent) {
+    const rect = _canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const lngLat = map.unproject([x, y]);
+    _pencilTapPending = true;
+    hideCtx(); closeEditDropdown(); closeDrawDropdown();
+    onMapClick({ lngLat, originalEvent, point: { x, y } });
+  }
+
+  // Path 1: Safari TouchEvents — touchType:"stylus" identifies Apple Pencil
+  _canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { _tapStart = null; return; }
+    const t = e.touches[0];
+    if (t.touchType !== 'stylus') { _tapStart = null; return; }
+    _tapStart = { x: t.clientX, y: t.clientY, time: Date.now() };
+    _pencilTapPending = false;
+  }, { passive: true });
+
+  _canvas.addEventListener('touchend', (e) => {
+    if (!_tapStart || e.changedTouches.length !== 1) return;
+    const t = e.changedTouches[0];
+    if (t.touchType !== 'stylus') { _tapStart = null; return; }
+    const dx = t.clientX - _tapStart.x;
+    const dy = t.clientY - _tapStart.y;
+    const dt = Date.now() - _tapStart.time;
+    _tapStart = null;
+    if (dt > 500 || Math.hypot(dx, dy) > 20) return;
+    _firePencilClick(t.clientX, t.clientY, e);
+  }, { passive: true });
+
+  // Path 2: Standard PointerEvents — pointerType:"pen"
   _canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'pen') return;
-    _pencilDown = { x: e.clientX, y: e.clientY, time: Date.now() };
+    if (!_tapStart) _tapStart = { x: e.clientX, y: e.clientY, time: Date.now() };
     _pencilTapPending = false;
   }, { passive: true });
 
   _canvas.addEventListener('pointerup', (e) => {
-    if (e.pointerType !== 'pen' || !_pencilDown) return;
-    const dx = e.clientX - _pencilDown.x;
-    const dy = e.clientY - _pencilDown.y;
-    const dt = Date.now() - _pencilDown.time;
-    _pencilDown = null;
-    if (dt > 500 || Math.hypot(dx, dy) > 15) return;
-    const rect = _canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const lngLat = map.unproject([x, y]);
-    _pencilTapPending = true;
-    hideCtx(); closeEditDropdown(); closeDrawDropdown();
-    onMapClick({ lngLat, originalEvent: e, point: { x, y } });
+    if (e.pointerType !== 'pen' || _pencilTapPending || !_tapStart) return;
+    const dx = e.clientX - _tapStart.x;
+    const dy = e.clientY - _tapStart.y;
+    const dt = Date.now() - _tapStart.time;
+    _tapStart = null;
+    if (dt > 500 || Math.hypot(dx, dy) > 20) return;
+    _firePencilClick(e.clientX, e.clientY, e);
   }, { passive: true });
 
+  // Guard: if we already handled the tap above, skip the native map.click
   map.on("click", (e) => {
     if (_pencilTapPending) { _pencilTapPending = false; return; }
     onMapClick(e);

@@ -8,6 +8,7 @@ const map = new maplibregl.Map({
   center: [2.3488, 48.8534],
   zoom: 13,
   preserveDrawingBuffer: true,  // needed for canvas-based image export
+  clickTolerance: 15,           // default 3px is too tight for Apple Pencil contact drift
 });
 
 // Set up GeoJSON data layers as soon as the initial style has loaded.
