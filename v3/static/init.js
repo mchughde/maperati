@@ -8,7 +8,42 @@ map.on('load', () => {
   renderAddStopModeRow();
 });
 
-map.on("click", onMapClick);
+// Apple Pencil support for MapLibre GL JS
+// MapLibre calls preventDefault() on pointerdown for drag handling, which suppresses
+// the browser's synthetic click after a short pencil tap. Detect taps via pointerup
+// and call onMapClick directly. Guard against double-fire if click does propagate.
+{
+  let _pencilDown = null;
+  let _pencilTapPending = false;
+  const _canvas = map.getCanvas();
+
+  _canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'pen') return;
+    _pencilDown = { x: e.clientX, y: e.clientY, time: Date.now() };
+    _pencilTapPending = false;
+  }, { passive: true });
+
+  _canvas.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'pen' || !_pencilDown) return;
+    const dx = e.clientX - _pencilDown.x;
+    const dy = e.clientY - _pencilDown.y;
+    const dt = Date.now() - _pencilDown.time;
+    _pencilDown = null;
+    if (dt > 500 || Math.hypot(dx, dy) > 15) return;
+    const rect = _canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const lngLat = map.unproject([x, y]);
+    _pencilTapPending = true;
+    hideCtx(); closeEditDropdown(); closeDrawDropdown();
+    onMapClick({ lngLat, originalEvent: e, point: { x, y } });
+  }, { passive: true });
+
+  map.on("click", (e) => {
+    if (_pencilTapPending) { _pencilTapPending = false; return; }
+    onMapClick(e);
+  });
+}
 map.on("click", () => { hideCtx(); closeEditDropdown(); closeDrawDropdown(); });
 map.on("contextmenu", (e) => {
   ctxLatLng = e.lngLat;
