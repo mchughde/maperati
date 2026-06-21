@@ -1,25 +1,56 @@
-# Maperati v2
+# Maperati v3
 
-A local browser app for planning and exporting walking routes in Paris (and anywhere else). Built on MapLibre GL JS with vector and raster map styles, ORS/OSRM routing, and a full suite of export formats.
+A browser app for planning and exporting walking routes in Paris (and anywhere else). Draw a route by tapping the map, add and organise stops, and export to GPX/KML/GeoJSON, an image, or street-by-street text directions.
+
+**v3 is a fully static app — there is no server or backend.** It runs entirely in the browser and is hosted on GitHub Pages, so it also works on an iPad (including "Add to Home Screen"). All routing, geocoding, and map data come from public web services called directly from the browser.
+
+**Live:** https://mchughde.github.io/maperati/v3/
 
 ---
 
-## Quick start
+## Running it
 
-```bash
-cd "/Users/diannemchugh/Library/CloudStorage/GoogleDrive-mchughde@gmail.com/My Drive/Map Generator/maperati"
-python3 app.py
-```
+- **Normal use:** just open the live URL above. Nothing to install.
+- **On an iPad:** open the live URL in Safari, then **Share → Add to Home Screen** to launch it full-screen like an app (see [PWA](#install-on-ipad-pwa)).
+- **Local development:** serve the `v3/` folder with any static file server and open it — for example:
+  ```bash
+  cd ".../Map Generator/maperati/v3"
+  python3 -m http.server 8000     # then open http://localhost:8000/
+  ```
+  No Python app, Flask, or build step is involved — the server only needs to serve static files.
 
-Open **http://localhost:5001/v2** in your browser.
+**Reloading after a code change:** type `location.reload(true)` in the browser console. Cmd+Shift+R does not reliably clear the cache here. (Developers: also bump the `?v=N` query on the asset links in `index.html` — see [Caching](#caching).)
 
-To reload after code changes: type `location.reload(true)` in the browser console. Cmd+Shift+R does not work.
+---
+
+## API key (OpenRouteService) — optional but recommended
+
+Click **API key** in the header to paste a free [OpenRouteService](https://openrouteservice.org/dev/#/signup) (ORS) token.
+
+- The key is saved **only in your browser** (`localStorage`) and never leaves your device or goes into the repo.
+- **With a key:** road-snapping, routing, and the elevation profile use ORS, which has the best coverage in central Paris.
+- **Without a key:** snapping and routing automatically fall back to the public **OSRM** service (works, but has gaps around Place de la Concorde and parts of Rue de Rivoli). The **elevation profile requires a key**.
+- **Text directions do not need a key** (street names come from OpenStreetMap’s Nominatim).
+
+Use the **API key** button again at any time to change or remove the saved key.
+
+---
+
+## Install on iPad (PWA)
+
+`manifest.json` + an app icon make Maperati installable:
+
+1. Open the live URL in Safari on the iPad.
+2. **Share → Add to Home Screen.**
+3. Launch from the home-screen icon — it opens standalone (no browser chrome).
+
+Drawing is **tap-based** and works with finger or Apple Pencil (a quick pen tap adds a point; a pen drag pans the map).
 
 ---
 
 ## Map styles
 
-The style switcher (top-right) offers:
+The style switcher (top-right) offers seven worldwide styles:
 
 | Style | Type | Notes |
 |-------|------|-------|
@@ -31,184 +62,153 @@ The style switcher (top-right) offers:
 | CartoDB Voyager | Raster | Colourful raster street map |
 | ESRI Satellite | Raster | Aerial imagery — useful for checking locations |
 
-All styles cover the entire world. Vector styles render client-side via WebGL and look sharpest, especially at fractional zoom levels. Raster styles fetch pre-rendered tiles.
-
-To add a new style, add one entry to `static/styles-config.js` — no other changes needed.
+Vector styles (from OpenFreeMap) render client-side via WebGL and look sharpest, especially at fractional zoom. Raster styles fetch pre-rendered tiles. To add a style, add one entry to `static/styles-config.js` — nothing else needs to change.
 
 ---
 
 ## Drawing a route
 
-1. Click **Draw ▾** in the bottom toolbar
-2. Choose **Snap** (follows roads) or **Free** (exact path)
-3. Click on the map to add points
-4. Click **Draw ▾ → Stop drawing** or use the Edit menu when done
+1. Click **Draw ▾** in the bottom toolbar.
+2. Choose **Snap** (follows roads) or **Free** (exact path).
+3. Tap the map to add points.
+4. **Draw ▾ → Stop drawing** when done.
 
-**Snap mode** calls the ORS/OSRM routing API to snap each click to the nearest road node within 40m. A temporary blue dot appears at your raw click while the snap resolves.
-
-**Free mode** draws a straight line exactly where you click — useful for footpaths, parks, and areas the router doesn't cover well.
-
-**Zoom**: use + / − buttons (top-left) for 0.25-step zoom, or scroll wheel. Right-click drag tilts the map (useful with vector styles to see building depth).
+- **Snap mode** snaps each tap to the nearest road within 40 m (ORS, or OSRM without a key). A temporary blue dot shows your raw tap while the snap resolves.
+- **Free mode** draws a straight line exactly where you tap — useful for footpaths, parks, and areas the router covers poorly.
+- **Zoom:** the **+ / −** buttons (top-left) step by 0.25 for fine control; scroll/pinch also work.
 
 ---
 
 ## Adding stops & markers
 
-**Method 1 — Tap map**: click "Tap map to add stop" in the sidebar, then click anywhere on the map. A popup opens where you name the stop and choose its type.
-
-**Method 2 — Search**: type a name or address in the "Search for a place" field. Click a result to open the add-stop popup at that location.
-
-**Method 3 — Click a dataset dot**: if you've imported a dataset, click any grey dot to add it as a stop.
-
-**Method 4 — Click an OSM POI**: after a Discover search, click any purple dot.
+- **Tap map** — click **Tap map to add stop** in the sidebar, then tap the map. A popup opens to name the stop and pick its type.
+- **Search a place** — type a name or address in **Search for a place** (Nominatim, worldwide); pick a result to open the popup there.
+- **Dataset dot** — after importing a dataset, tap any grey dot to add it.
+- **Discover dot** — after a [Discover](#discover-osm-poi-search) search, tap any purple dot.
 
 ### Stop types
-- **Numbered** (default) — dark circle with auto-incrementing number
-- **Category markers** — 19 types: Best street, Garden, Museum, Church, Monument, Cafe/restaurant, Market, Accommodation, Shop, Transport, Viewpoint, Theatre, Facilities, Bar/wine, Library, plus 4 custom colour dots (Rose, Amber, Sky, Lime)
+- **Numbered** (default) — dark circle with an auto-incrementing number.
+- **Category markers** — 19 types: Best street, Garden, Museum, Church, Monument, Cafe/restaurant, Market, Accommodation, Shop, Transport, Viewpoint, Theatre, Facilities, Bar/wine, Library, plus four custom colour dots (Rose, Amber, Sky, Lime).
 
-### Stop roles
-Set via the ⋯ menu on each stop in the sidebar:
-- **Start** — green pill at that location
-- **End** — red pill
-- **Start & End** — split green/red pill for loop routes
+### Stop roles (⋯ menu on each stop)
+- **Start** — green pill · **End** — red pill · **Start & End** — split green/red pill for loop routes.
 
-### Stop features
-- **Drag to reorder** using the ⠿ handle
-- **Rename** with the ✎ button
-- **Notes** — click "Add note" under any stop; saved and exported
-- **Route to next** — appears between consecutive stops; routes via ORS/OSRM
-- **Locate** — click the stop's badge in the sidebar to pan to it
+### Working with the stop list
+- **Drag to reorder** with the ⠿ handle (touch: press and hold, then drag).
+- **Rename** (✎), set **role/category** (⋯), add a **note**, or **remove** (×).
+- **Route to next** appears between consecutive stops — routes that leg along roads.
+- **Route all stops** (footer) routes every consecutive pair in order.
+- **Locate** — tap a stop’s badge in the sidebar to pan to it.
 
 ---
 
 ## Editing the route
 
-All editing is in **Edit ▾** (bottom toolbar, appears once a route exists):
+**Edit ▾** (bottom toolbar, appears once a route exists):
 
-- **Undo / Redo** — full undo/redo covering drawing, stops, erasure, reversal. Keyboard: Cmd+Z / Cmd+Shift+Z. Up to 20 undo steps.
-- **Erase section** — click two points on the route; the section between them is removed and automatically rerouted
-- **Reverse route** — reverses the entire line and swaps stop order
-- **Clear entire route** — removes the route line (stops remain)
+- **Undo / Redo** — covers drawing, stops, erase, reverse (up to 20 steps). Keyboard: **Cmd+Z** / **Cmd+Shift+Z**.
+- **Erase section** — tap two points on the route; the bit between them is removed and re-routed.
+- **Reverse route** — reverses the line and swaps stop order.
+- **Clear entire route** — removes the line (stops remain).
 
-**Right-click anywhere on the map** opens a context menu:
-- **Open in Street View** — opens Google Maps Street View at that location in a new tab (always available)
-- **Redo route from here** — trims the route to the nearest point and resumes drawing from there (requires a route)
-- **Route via here** — forces the route through a specific point (orange detour marker); click the marker to remove it (requires a route)
-- **Clear entire route** — removes the route line (requires a route)
+**Right-click the map** (desktop) for a context menu:
+- **Open in Street View** — opens Google Street View at that point (always available).
+- **Redo route from here** — trims to the nearest route point and resumes drawing (needs a route).
+- **Route via here** — forces the route through a point with an orange detour marker; tap the marker to remove it (needs a route).
+- **Clear entire route**.
 
 ---
 
 ## Travel modes
 
-The mode pill (top-centre, next to route stats) sets the routing profile:
+The mode pill (top-centre, next to route stats) sets the routing profile and the speed used for the time estimate:
 
-| Mode | Profile | Speed used for time estimate |
-|------|---------|------------------------------|
-| Walking | ORS foot-walking | ~4.5 km/h |
-| Running | ORS foot-walking | ~10 km/h |
-| Hiking | ORS foot-hiking | ~3.5 km/h |
-| Cycling | ORS cycling-regular | ~15 km/h |
-| Driving | ORS driving-car | ~60 km/h |
+| Mode | Profile | Speed |
+|------|---------|-------|
+| Walking | foot-walking | ~4.5 km/h |
+| Running | foot-walking | ~10 km/h |
+| Hiking | foot-hiking | ~3.5 km/h |
+| Cycling | cycling-regular | ~15 km/h |
+| Driving | driving-car | ~60 km/h |
 
-Switching mode after drawing a route shows a toast to re-draw — the routing profile has changed so existing segments may not match the new mode.
+Switching mode after drawing shows a toast to re-draw, since the routing profile changed.
 
 ---
 
 ## Discover (OSM POI search)
 
-The **Discover** section searches OpenStreetMap for places in the current map view via the Overpass API:
+**Discover** searches OpenStreetMap for places in the current map view via the Overpass API.
 
-Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market
+Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market.
 
-Results appear as **purple dots**. Click a dot to open the add-stop popup (name pre-filled). Click **Clear** to remove them.
-
-Primary endpoint: `overpass-api.de` — falls back to `overpass.kumi.systems` on timeout.
+Results appear as **purple dots** — tap one to open the add-stop popup (name pre-filled), or **Clear** to remove them. Primary endpoint `overpass-api.de`, falling back to `overpass.kumi.systems` on timeout.
 
 ---
 
 ## Importing data
 
-Drag a file onto the drop zone (or click to browse). Supported formats:
+Drag a file onto the drop zone (or click to browse):
 
 | Format | What happens |
 |--------|-------------|
-| **GPX** | Track/route → drawn as route line; waypoints → added as stops; elevation pre-loaded from `<ele>` tags |
-| **GeoJSON** | Points → dataset dots on map; LineString → drawn as route |
+| **GPX** | Track/route → route line; waypoints → stops; elevation pre-loaded from `<ele>` tags |
+| **GeoJSON** | Points → dataset dots; LineString → route |
 | **KML** | Placemarks → dataset dots |
-| **CSV** | Points → dataset dots (requires lat/lng columns); delimiter auto-detected |
+| **CSV** | Points → dataset dots (needs lat/lng columns); delimiter auto-detected, parsed in-browser |
 | **Session JSON** | Restores a previously saved Maperati session completely |
 
-### Dataset filters (after CSV/GeoJSON import)
-- **Filter by arrondissement** — Paris 1er–20e dropdown
-- **Search by name** — filters dots by name in real time
-- **Filter by area** — draw a rectangle on the map to show only dots inside it
-- **POI markers visible** — toggle dot visibility on/off
+After a CSV/GeoJSON import you also get: **arrondissement filter** (Paris), **name search**, **filter by area** (draw a rectangle), and a **POI visibility** toggle.
 
 ---
 
 ## Exports
 
-All exports are client-side (no server involved for data formats).
+All exports run in the browser. Open **Export ▾** (header), set a file name, then choose:
 
-### Data formats
-In the **Export ▾** menu (top-right): set a file name, then choose:
-- **GeoJSON** — route line + stops with colours
-- **GPX** — route track + waypoints with notes
-- **KML** — route + placemarks for Google Earth/Maps
-- **CSV stops** — stop list with lat/lng, role, category, notes
-- **Text directions** — turn-by-turn directions derived from the drawn route geometry (not re-routed between stops)
-
-### Image export (JPG)
-1. Optionally click **Set image area** to draw a rectangle defining the crop
-2. Choose a **Print quality** setting:
-   - **Screen** — current screen resolution (already 2× on Retina); good for on-screen use
-   - **2×** — doubles the canvas size; good for A4 printing (~200 DPI on Retina)
-   - **3×** — triples the canvas size; best print quality (~300 DPI on Retina)
-3. Click **Export image (JPG)**
-
-The map fits to the print area (or route bounds), then composites the MapLibre canvas with hand-drawn stop markers on top. Higher resolution settings take a few seconds longer while the map re-renders. Higher-res files are named with a suffix (`_2x.jpg`, `_3x.jpg`).
-
-**Note on raster styles**: Vector styles (OSM Bright, Liberty, Positron) benefit fully from higher resolution — text and lines are genuinely crisper. Raster styles (OpenStreetMap, CartoDB, ESRI Satellite) use fixed-size tiles so gain less — Screen or 2× is sufficient for those.
-
-### Session file
-**Save session file** downloads a `.json` snapshot of everything — route, stops, names, roles, notes, detour points, map position. Drop it back into Import to restore exactly.
+- **GeoJSON** — route line + stops with colours.
+- **GPX** — route track + waypoints with notes.
+- **KML** — route + placemarks for Google Earth/Maps.
+- **CSV stops** — stop list with lat/lng, role/category, notes.
+- **Text directions** — street-by-street directions **derived from your drawn line** (not re-routed between stops). Street names are looked up from OpenStreetMap, so it shows `Building… n/n` progress for a few seconds, then offers the file (on iPad, tap the **“Directions ready — tap to save”** link). Needs at least 2 stops and a drawn route.
+- **Image (JPG)** — optionally **Set image area** (drag a rectangle), pick a **Print quality** (Screen / 2× / 3×), then **Export image (JPG)**. Vector styles benefit most from higher quality; raster styles gain less.
+- **Save session file** — a `.json` snapshot of everything (route, stops, names, roles, notes, detours, map position). Drop it back into Import to restore exactly.
 
 ---
 
 ## Elevation profile
 
-Once a route is drawn, click **Elevation** in the route stats pill (top-centre):
-- Hover over the chart to see distance and elevation at any point; a blue marker appears on the map
-- Click the chart to pan the map to that location
-- Elevation data comes from GPX `<ele>` tags (if imported) or the ORS elevation API
+Once a route is drawn, click **Elevation** in the route-stats pill:
+- Hover the chart for distance + elevation at any point (a marker appears on the map); click to pan there.
+- Data comes from GPX `<ele>` tags (if imported) or the ORS elevation API — so the live profile **requires an ORS key**.
 
 ---
 
 ## Route stats
 
-The stats pill shows **total distance** and **estimated time** based on the active travel mode. Time is a straight calculation from distance and mode speed — not a routing estimate.
+The stats pill shows **total distance** and **estimated time** for the active travel mode. Time is distance ÷ mode speed, not a routing estimate.
 
 ---
 
 ## Session auto-save
 
-The session is saved automatically to `localStorage` (key: `maperati_v2_session`) after every significant action. It restores on page reload. It does not conflict with v1's session (different key).
+The session is saved to `localStorage` (key `maperati_v3_session`) after every significant action and restored on reload. The key is unique to v3.
 
 ---
 
-## API and routing
+## Data sources & privacy
 
-The Flask backend at `app.py` (shared with v1) provides:
+Everything runs client-side; there is no Maperati server. The app talks directly to:
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/snap-point` | Snap a click to nearest road node (ORS primary, OSRM fallback) |
-| `POST /api/snap-segment` | Route between two points |
-| `POST /api/elevation` | Elevation profile for route coords |
-| `POST /api/match-directions` | Geometry-first text directions |
-| `POST /api/upload-csv` | Server-side CSV parsing |
+| Service | Used for |
+|---------|----------|
+| OpenFreeMap | Vector map tiles |
+| OpenStreetMap / CartoDB / ESRI | Raster map tiles |
+| OpenRouteService (ORS) | Snapping, routing, elevation (with your key) |
+| OSRM | Routing fallback (no key) |
+| Nominatim (OpenStreetMap) | Place search + street names for directions |
+| Overpass | Discover POI search |
 
-**ORS API key**: stored in `.env` as `ORS_API_KEY=...` (gitignored). Get a free key at openrouteservice.org. Without it, all routing falls back to public OSRM — which works but has known gaps in central Paris (Place de la Concorde, parts of Rue de Rivoli).
+Your route, stops, and ORS key stay in your browser’s `localStorage`. Exported files are generated and downloaded locally.
 
 ---
 
@@ -216,9 +216,8 @@ The Flask backend at `app.py` (shared with v1) provides:
 
 | Shortcut | Action |
 |----------|--------|
-| Cmd+Z | Undo (or undo last draw point while drawing) |
-| Cmd+Shift+Z | Redo |
-| Cmd+Y | Redo (alternative) |
+| Cmd+Z | Undo (or undo last point while free-drawing) |
+| Cmd+Shift+Z / Cmd+Y | Redo |
 
 ---
 
@@ -238,16 +237,30 @@ The Flask backend at `app.py` (shared with v1) provides:
 ## Project structure
 
 ```
-maperati/
-├── app.py              ← Flask backend (shared with v1)
-├── .env                ← ORS_API_KEY (gitignored)
-├── index.html          ← v1 app (untouched)
-├── static/             ← v1 JS/CSS (untouched)
-└── v2/
-    ├── README.md       ← this file
-    ├── CLAUDE.md       ← developer/AI notes
-    ├── index.html
-    └── static/         ← v2 JS/CSS (13 files, ~3,250 lines)
+v3/
+├── index.html        ← markup + script tags (load order matters)
+├── manifest.json     ← PWA manifest (Add to Home Screen)
+├── icon-192.svg      ← app icon
+├── README.md         ← this file
+├── CLAUDE.md         ← developer / AI notes
+└── static/
+    ├── app.css           ← all styles
+    ├── styles-config.js  ← map style registry
+    ├── state.js          ← globals, CATEGORIES, TRAVEL_MODES, helpers
+    ├── api.js            ← ORS/OSRM/Nominatim calls + directions pipeline
+    ├── map-init.js       ← MapLibre map, controls, GeoJSON layers
+    ├── icons.js          ← marker elements + renderStopMarkers
+    ├── drawing.js        ← draw modes, undo/redo, erase, detours
+    ├── elevation.js      ← elevation chart
+    ├── routing.js        ← route-between-stops helpers
+    ├── stops.js          ← stop CRUD, geocode, drag-reorder
+    ├── import.js         ← file parsing, filters, area/print rectangles
+    ├── exports.js        ← all exports + image/print
+    ├── discover.js       ← Overpass POI search
+    ├── ui.js             ← sidebar, dropdowns, session, ORS-key modal
+    └── init.js           ← wires events; restores session (loads last)
 ```
 
-V1 remains fully functional at `http://localhost:5001` and is unaffected by any v2 changes.
+## Caching
+
+Every asset link in `index.html` carries a `?v=N` query (currently `?v=10`). **Bump `N` on every JS/CSS change** — otherwise Safari may serve stale files, which looks like a bug.
