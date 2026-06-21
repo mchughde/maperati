@@ -61,16 +61,17 @@ map.on('load', () => {
     'background:transparent;cursor:crosshair;z-index:1';
   map.getCanvasContainer().appendChild(_overlay);
 
-  let _stroke   = null;   // active stroke: { count }
-  let _activeId = null;   // pointerId currently drawing (ignore extra fingers)
-  let _last     = [0, 0]; // last sampled client position
-  const MIN_PX  = 4;      // min pixel travel between sampled points
+  let _stroke = null;   // active stroke: { count }
+  let _id     = null;   // active pointerId (ignore extra fingers/palm)
+  let _last   = [0, 0]; // last sampled client position
+  let _active = 0;      // timestamp of last down/move — used to recover stuck strokes
+  const MIN_PX = 4;     // min pixel travel between sampled points
 
   // Toggled by syncPenPanState() (drawing.js) on every draw / mode change.
   window.syncFreeDrawOverlay = () => {
     const active = drawing && drawMode === 'free';
     _overlay.style.pointerEvents = active ? 'auto' : 'none';
-    if (!active) { _stroke = null; _activeId = null; }
+    if (!active) _reset();
   };
 
   const _unproj = (cx, cy) => {
@@ -84,13 +85,32 @@ map.on('load', () => {
       );
     }
   };
-  const _finish = () => {
-    if (!_stroke) { _activeId = null; return; }
-    routeSegments.push(_stroke.count);   // whole stroke = one undo step
-    dotMarkers.push(null);
-    routeDistM = calcDist(routeCoords);
-    const n = _stroke.count;
-    _stroke = null; _activeId = null;
+  // Detach the window listeners and clear stroke state.
+  const _reset = () => {
+    window.removeEventListener('pointermove', _onMove);
+    window.removeEventListener('pointerup', _onEnd);
+    window.removeEventListener('pointercancel', _onEnd);
+    _stroke = null; _id = null;
+  };
+  const _onMove = (e) => {
+    if (e.pointerId !== _id || !_stroke) return;
+    if (Math.hypot(e.clientX - _last[0], e.clientY - _last[1]) < MIN_PX) return;
+    _last = [e.clientX, e.clientY];
+    _active = Date.now();
+    const ll = _unproj(e.clientX, e.clientY);
+    routeCoords.push([ll.lat, ll.lng]);
+    _stroke.count++;
+    _live();
+  };
+  const _onEnd = (e) => {
+    if (e.pointerId !== _id) return;
+    const n = _stroke ? _stroke.count : 0;
+    if (_stroke) {
+      routeSegments.push(_stroke.count);   // whole stroke = one undo step
+      dotMarkers.push(null);
+      routeDistM = calcDist(routeCoords);
+    }
+    _reset();
     redrawRoute();
     updateRouteStats();
     document.getElementById('editMenuBtn').style.display = 'flex';
@@ -99,31 +119,28 @@ map.on('load', () => {
   };
 
   _overlay.addEventListener('pointerdown', (e) => {
-    if (_activeId !== null) return;          // already drawing with another pointer
-    _activeId = e.pointerId;
-    if (_overlay.setPointerCapture) _overlay.setPointerCapture(e.pointerId);
+    if (_id !== null) {
+      // Another pointer is mid-stroke. Ignore it — unless the previous stroke
+      // looks stuck (no activity for >4s), in which case recover from it.
+      if (Date.now() - _active < 4000) return;
+      _reset();
+    }
+    _id = e.pointerId;
+    _stroke = { count: 1 };
     _last = [e.clientX, e.clientY];
+    _active = Date.now();
     hideCtx(); closeEditDropdown(); closeDrawDropdown();
     pushUndo();
     const ll = _unproj(e.clientX, e.clientY);
     routeCoords.push([ll.lat, ll.lng]);
-    _stroke = { count: 1 };
     _live();
+    // Listen on window, not the overlay: Safari can drop pointerup on the
+    // element after pointer capture, which would wedge the stroke forever.
+    window.addEventListener('pointermove', _onMove, { passive: true });
+    window.addEventListener('pointerup', _onEnd, { passive: true });
+    window.addEventListener('pointercancel', _onEnd, { passive: true });
     if (window._pdlog) window._pdlog(`draw start (${e.pointerType})`);
   });
-
-  _overlay.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== _activeId || !_stroke) return;
-    if (Math.hypot(e.clientX - _last[0], e.clientY - _last[1]) < MIN_PX) return;
-    _last = [e.clientX, e.clientY];
-    const ll = _unproj(e.clientX, e.clientY);
-    routeCoords.push([ll.lat, ll.lng]);
-    _stroke.count++;
-    _live();
-  });
-
-  _overlay.addEventListener('pointerup',     (e) => { if (e.pointerId === _activeId) _finish(); });
-  _overlay.addEventListener('pointercancel', (e) => { if (e.pointerId === _activeId) _finish(); });
 }
 
 // ── Pen taps in Snap / erase / add-stop modes ─────────────
