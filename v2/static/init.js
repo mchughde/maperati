@@ -11,17 +11,24 @@ map.on('load', () => {
 map.on("click", onMapClick);
 map.on("click", () => { hideCtx(); closeEditDropdown(); closeDrawDropdown(); });
 map.on("contextmenu", (e) => {
-  if (!routeCoords.length) return;
   ctxLatLng = e.lngLat;
   const ctx = document.getElementById("ctxMenu");
   ctx.style.display = "block";
   ctx.style.left = (e.point.x + 8) + "px";
   ctx.style.top  = (e.point.y + 8) + "px";
-  document.getElementById("ctxRedoFrom").onclick =
-    () => redoFromHere(e.lngLat.lat, e.lngLat.lng);
+  const hasRoute = routeCoords.length > 0;
+  const redoEl = document.getElementById("ctxRedoFrom");
+  redoEl.style.display = hasRoute ? 'block' : 'none';
+  redoEl.onclick = () => redoFromHere(e.lngLat.lat, e.lngLat.lng);
   const viaEl = document.getElementById("ctxViaHere");
-  viaEl.style.display = drawing ? 'none' : 'block';
+  viaEl.style.display = (hasRoute && !drawing) ? 'block' : 'none';
   viaEl.onclick = () => routeViaHere(e.lngLat.lat, e.lngLat.lng);
+  const clearEl = document.querySelector("#ctxMenu [onclick*='clearDrawing']");
+  if (clearEl) clearEl.style.display = hasRoute ? 'block' : 'none';
+  document.getElementById("ctxStreetView").onclick = () => {
+    window.open(`https://www.google.com/maps?layer=c&cbll=${e.lngLat.lat},${e.lngLat.lng}`, '_blank');
+    hideCtx();
+  };
 });
 
 // Keyboard shortcuts

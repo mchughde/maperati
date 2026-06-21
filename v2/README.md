@@ -90,9 +90,11 @@ All editing is in **Edit ▾** (bottom toolbar, appears once a route exists):
 - **Reverse route** — reverses the entire line and swaps stop order
 - **Clear entire route** — removes the route line (stops remain)
 
-**Right-click on the map** (when a route exists) opens a context menu:
-- **Redo route from here** — trims the route to the nearest point and resumes drawing from there
-- **Route via here** — forces the route through a specific point (orange detour marker); click the marker to remove it
+**Right-click anywhere on the map** opens a context menu:
+- **Open in Street View** — opens Google Maps Street View at that location in a new tab (always available)
+- **Redo route from here** — trims the route to the nearest point and resumes drawing from there (requires a route)
+- **Route via here** — forces the route through a specific point (orange detour marker); click the marker to remove it (requires a route)
+- **Clear entire route** — removes the route line (requires a route)
 
 ---
 
