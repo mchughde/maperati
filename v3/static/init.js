@@ -45,77 +45,124 @@ map.on('load', () => {
   map.on('click', () => window._pdlog(`>> MapLibre CLICK   drawing=${drawing}`));
 }
 
-// Apple Pencil support for MapLibre GL JS on Safari/iPadOS
-// Two-path approach: Safari fires TouchEvents with touchType:"stylus" AND/OR
-// PointerEvents with pointerType:"pen" for Apple Pencil. clickTolerance:15 (in
-// map-init.js) widens MapLibre's tap window, but we also intercept directly here
-// in case the native click is still suppressed by drag capture.
-// _pencilTapPending guards against double-fire if both paths trigger.
+// Apple Pencil support for MapLibre GL JS on Safari/iPadOS.
+// Safari fires reliable PointerEvents with pointerType:"pen" for the Pencil
+// (confirmed on-device), so we drive everything off those.
+//
+//   Free mode  : a pen DRAG draws a continuous freehand line. We disable the
+//                map's drag-pan only for the duration of the stroke, so a
+//                FINGER can still pan/zoom the map while the Pencil draws.
+//   Snap mode  : a pen TAP drops a road-snapped point (drag pans, as normal).
+//   Any mode   : a pen TAP is routed through onMapClick so add-stop / erase /
+//                bbox / print-area modes keep working with the Pencil.
 {
-  let _tapStart = null;
-  let _pencilTapPending = false;
   const _canvas = map.getCanvas();
+  let _penStroke = null;   // active freehand stroke: {lastClient:[x,y], count}
+  let _penDown   = null;   // pen-down marker for tap detection: {x,y,time}
+  let _penUpAt   = 0;      // timestamp of last handled pen-up (dedups native click)
+  const MIN_PX   = 5;      // min pixel travel between sampled freehand points
+  const TAP_MS   = 600;    // max contact time still counted as a tap
+  const TAP_PX   = 15;     // max travel still counted as a tap
 
-  function _firePencilClick(clientX, clientY, originalEvent) {
-    const rect = _canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    const lngLat = map.unproject([x, y]);
-    _pencilTapPending = true;
-    if (window._pdlog) window._pdlog(`** PENCIL handler fired -> onMapClick (drawing=${drawing})`);
-    hideCtx(); closeEditDropdown(); closeDrawDropdown();
-    onMapClick({ lngLat, originalEvent, point: { x, y } });
-  }
+  const _xy = (clientX, clientY) => {
+    const r = _canvas.getBoundingClientRect();
+    return [clientX - r.left, clientY - r.top];
+  };
+  const _liveRoute = () => {
+    if (map.getSource('route')) {
+      map.getSource('route').setData(
+        routeCoords.length > 1 ? routeCoordsToGeoJSON(routeCoords) : emptyCollection()
+      );
+    }
+  };
+  const _endStroke = () => {
+    map.dragPan.enable();
+    if (map.dragRotate) map.dragRotate.enable();
+  };
 
-  // Path 1: Safari TouchEvents — touchType:"stylus" identifies Apple Pencil.
-  // When touchType is NOT 'stylus' we just return without touching _tapStart —
-  // the pointerdown path may have already set it and we must not clear it.
-  _canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    const t = e.touches[0];
-    if (t.touchType !== 'stylus') return;
-    _tapStart = { x: t.clientX, y: t.clientY, time: Date.now() };
-    _pencilTapPending = false;
-  }, { passive: true });
-
-  _canvas.addEventListener('touchend', (e) => {
-    if (e.changedTouches.length !== 1) return;
-    const t = e.changedTouches[0];
-    if (t.touchType !== 'stylus') return;  // leave _tapStart for pointerup to handle
-    const start = _tapStart;
-    _tapStart = null;
-    if (_pencilTapPending || !start) return;
-    const dt = Date.now() - start.time;
-    if (dt > 500 || Math.hypot(t.clientX - start.x, t.clientY - start.y) > 20) return;
-    _firePencilClick(t.clientX, t.clientY, e);
-  }, { passive: true });
-
-  // Path 2: Standard PointerEvents — pointerType:"pen".
-  // Always (re)set _tapStart on pointerdown so each pencil touch gets a fresh baseline.
   _canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'pen') return;
-    _tapStart = { x: e.clientX, y: e.clientY, time: Date.now() };
-    _pencilTapPending = false;
+    _penDown = { x: e.clientX, y: e.clientY, time: Date.now() };
+
+    if (drawing && drawMode === 'free') {
+      // Take over panning for this stroke; finger pan resumes on pointerup.
+      map.dragPan.disable();
+      if (map.dragRotate) map.dragRotate.disable();
+      hideCtx(); closeEditDropdown(); closeDrawDropdown();
+      pushUndo();
+      const [x, y] = _xy(e.clientX, e.clientY);
+      const ll = map.unproject([x, y]);
+      routeCoords.push([ll.lat, ll.lng]);
+      _penStroke = { lastClient: [e.clientX, e.clientY], count: 1 };
+      _liveRoute();
+      if (window._pdlog) window._pdlog('pen DOWN (free) — stroke start');
+    }
+  }, { passive: true });
+
+  _canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'pen' || !_penStroke) return;
+    const [lx, ly] = _penStroke.lastClient;
+    if (Math.hypot(e.clientX - lx, e.clientY - ly) < MIN_PX) return;
+    _penStroke.lastClient = [e.clientX, e.clientY];
+    const [x, y] = _xy(e.clientX, e.clientY);
+    const ll = map.unproject([x, y]);
+    routeCoords.push([ll.lat, ll.lng]);
+    _penStroke.count++;
+    _liveRoute();
   }, { passive: true });
 
   _canvas.addEventListener('pointerup', (e) => {
     if (e.pointerType !== 'pen') return;
-    const start = _tapStart;
-    _tapStart = null;
-    if (_pencilTapPending || !start) return;
-    const dt = Date.now() - start.time;
-    if (dt > 500 || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 20) return;
-    _firePencilClick(e.clientX, e.clientY, e);
+
+    // Finalise a freehand stroke (Free mode)
+    if (_penStroke) {
+      _endStroke();
+      routeSegments.push(_penStroke.count);  // whole stroke = one undo step
+      dotMarkers.push(null);
+      routeDistM = calcDist(routeCoords);
+      const n = _penStroke.count;
+      _penStroke = null;
+      _penDown = null;
+      _penUpAt = Date.now();
+      redrawRoute();
+      updateRouteStats();
+      document.getElementById('editMenuBtn').style.display = 'flex';
+      document.getElementById('editDivider').style.display = 'block';
+      if (window._pdlog) window._pdlog(`pen UP — stroke ${n} pts`);
+      return;
+    }
+
+    // Otherwise: was it a tap? (Snap mode point, add-stop, erase, bbox, etc.)
+    if (_penDown) {
+      const dt = Date.now() - _penDown.time;
+      const moved = Math.hypot(e.clientX - _penDown.x, e.clientY - _penDown.y);
+      _penDown = null;
+      if (dt <= TAP_MS && moved <= TAP_PX) {
+        _penUpAt = Date.now();
+        const [x, y] = _xy(e.clientX, e.clientY);
+        const lngLat = map.unproject([x, y]);
+        hideCtx(); closeEditDropdown(); closeDrawDropdown();
+        if (window._pdlog) window._pdlog(`pen TAP -> onMapClick (drawing=${drawing})`);
+        onMapClick({ lngLat, originalEvent: e, point: { x, y } });
+      }
+      // else: it was a drag — MapLibre already panned; nothing to do.
+    }
   }, { passive: true });
 
-  // Clear stale state if the OS cancels the touch (e.g. system gesture)
   _canvas.addEventListener('pointercancel', (e) => {
-    if (e.pointerType === 'pen') _tapStart = null;
+    if (e.pointerType !== 'pen') return;
+    if (_penStroke) {
+      _endStroke();
+      _penStroke = null;
+      redrawRoute();
+    }
+    _penDown = null;
   }, { passive: true });
 
-  // Guard: if we already handled the tap above, skip the native map.click
-  map.on("click", (e) => {
-    if (_pencilTapPending) { _pencilTapPending = false; return; }
+  // Native click (finger / mouse). Skip if we just handled a pen up, so a
+  // synthetic click can't double-add a point.
+  map.on('click', (e) => {
+    if (Date.now() - _penUpAt < 700) return;
     onMapClick(e);
   });
 }
