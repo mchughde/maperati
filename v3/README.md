@@ -98,6 +98,7 @@ Vector styles (from OpenFreeMap) render client-side via WebGL and look sharpest,
 - **Rename** (✎), set **role/category** (⋯), add a **note**, or **remove** (×).
 - **Route to next** appears between consecutive stops — routes that leg along roads.
 - **Route all stops** (footer) routes every consecutive pair in order.
+- **Optimise order** (footer, with 3+ stops) reorders your stops into the shortest **walking** route between them using real road distances (ORS/OSRM); then press *Route all stops* to draw it. Any stop you’ve pinned as **Start**, **End**, or loop point stays in place — only the stops in between are reordered.
 - **Locate** — tap a stop’s badge in the sidebar to pan to it.
 
 ---
@@ -203,8 +204,8 @@ Everything runs client-side; there is no Maperati server. The app talks directly
 |---------|----------|
 | OpenFreeMap | Vector map tiles |
 | OpenStreetMap / CartoDB / ESRI | Raster map tiles |
-| OpenRouteService (ORS) | Snapping, routing, elevation (with your key) |
-| OSRM | Routing fallback (no key) |
+| OpenRouteService (ORS) | Snapping, routing, elevation, distance matrix (with your key) |
+| OSRM | Routing & distance-matrix fallback (no key) |
 | Nominatim (OpenStreetMap) | Place search + street names for directions |
 | Overpass | Discover POI search |
 

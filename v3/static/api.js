@@ -121,6 +121,46 @@ async function apiElevation(coords) {
   }
 }
 
+// Pairwise walking-cost matrix between points ([lat,lng]) in ONE request:
+// ORS Matrix (with key) → OSRM /table fallback. Returns { ok, matrix } where
+// matrix[i][j] = cost from point i to j (metres if available, else seconds —
+// consistent within one result). Used by Optimise order.
+async function apiDistanceMatrix(points, orsProfile, osrmProfile) {
+  if (!points || points.length < 2) return { ok: false };
+
+  if (orsKey()) {
+    try {
+      const res = await fetch(`${ORS_BASE}/matrix/${orsProfile}`, {
+        method: 'POST',
+        headers: { 'Authorization': orsKey(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locations: points.map(([lat, lng]) => [lng, lat]),
+          metrics: ['distance'],
+          units: 'm',
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.distances) && data.distances.length === points.length) {
+          return { ok: true, matrix: data.distances };
+        }
+      }
+    } catch (e) {}
+  }
+
+  try {
+    const coordStr = points.map(([lat, lng]) => `${lng},${lat}`).join(';');
+    const res = await fetch(`${OSRM_URL}/table/v1/${osrmProfile}/${coordStr}?annotations=distance,duration`);
+    const data = await res.json();
+    if (data.code === 'Ok') {
+      const m = data.distances || data.durations;
+      if (Array.isArray(m) && m.length === points.length) return { ok: true, matrix: m };
+    }
+  } catch (e) {}
+
+  return { ok: false };
+}
+
 // ═══ Geometry-first walking directions (client-side port of the Flask pipeline)
 // Turns are detected from the DRAWN route geometry (routeCoords); street names
 // come from Nominatim reverse-geocoding. The directions follow the blue line

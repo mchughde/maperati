@@ -172,6 +172,7 @@ function renderStops() {
   empty.style.display = selectedStops.length ? "none" : "block";
   document.getElementById("clearStopsBtn").style.display = selectedStops.length ? "inline-flex" : "none";
   document.getElementById("routeAllBtn").style.display = selectedStops.length >= 2 ? "inline-flex" : "none";
+  document.getElementById("optimiseBtn").style.display = selectedStops.length >= 3 ? "inline-flex" : "none";
   ctrl.style.display = selectedStops.length ? "flex" : "none";
 
   const stopCumDs = computeStopCumulDists();
@@ -473,34 +474,109 @@ function fitMapToStops(stops) {
   );
 }
 
-function optimiseOrder() {
-  if (selectedStops.length < 3) return;
-  const d = (a, b) => Math.hypot(a.lat-b.lat, (a.lng-b.lng)*Math.cos(a.lat*Math.PI/180));
-  let best = null, bestLen = Infinity;
-  for (let s = 0; s < selectedStops.length; s++) {
-    const rem = [...selectedStops];
-    const tour = [rem.splice(s,1)[0]];
-    while (rem.length) {
-      const last = tour[tour.length-1];
-      let ni=0, nd=Infinity;
-      rem.forEach((x,i) => { const dd=d(last,x); if(dd<nd){nd=dd;ni=i;} });
-      tour.push(rem.splice(ni,1)[0]);
-    }
-    let improved = true;
-    while (improved) {
-      improved = false;
-      for (let i=0;i<tour.length-2;i++) for (let j=i+2;j<tour.length-1;j++) {
-        if (d(tour[i],tour[i+1])+d(tour[j],tour[j+1]) > d(tour[i],tour[j])+d(tour[i+1],tour[j+1])+1e-9) {
-          tour.splice(i+1,j-i,...tour.slice(i+1,j+1).reverse());
-          improved=true;
+// ── Optimise stop order by real walking distance ──────────
+// Reorders the unpinned stops into the shortest visiting sequence using a
+// walking-distance matrix (ORS/OSRM, current travel mode). A stop pinned as
+// Start (or loop point) stays first; a stop pinned as End stays last. Does NOT
+// draw the route — use "Route all stops" afterwards.
+
+function _tourLen(M, t) {
+  let s = 0;
+  for (let i = 0; i < t.length - 1; i++) s += M[t[i]][t[i + 1]];
+  return s;
+}
+
+function _nnChain(M, start, pool) {
+  const rem = new Set(pool);
+  const tour = [start];
+  let last = start;
+  while (rem.size) {
+    let nd = Infinity, ni = -1;
+    rem.forEach(x => { if (M[last][x] < nd) { nd = M[last][x]; ni = x; } });
+    tour.push(ni); rem.delete(ni); last = ni;
+  }
+  return tour;
+}
+
+// 2-opt that never moves the first or last position (fixed endpoints).
+function _twoOptFixedEnds(M, tour) {
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < tour.length - 2; i++) {
+      for (let j = i + 2; j < tour.length - 1; j++) {
+        const a = tour[i], b = tour[i + 1], c = tour[j], d = tour[j + 1];
+        if (M[a][b] + M[c][d] > M[a][c] + M[b][d] + 1e-9) {
+          let lo = i + 1, hi = j;
+          while (lo < hi) { const t = tour[lo]; tour[lo] = tour[hi]; tour[hi] = t; lo++; hi--; }
+          improved = true;
         }
       }
     }
-    const len = tour.slice(1).reduce((acc,x,i)=>acc+d(tour[i],x),0);
-    if (len < bestLen) { bestLen=len; best=tour; }
   }
-  selectedStops = best;
+  return tour;
+}
+
+// Shortest open path over matrix indices 0..n-1, optionally fixing index 0
+// (lockFirst) and/or index n-1 (lockLast). Returns the visiting order.
+function _solveOpenTSP(M, n, lockFirst, lockLast) {
+  if (n <= 2) return Array.from({ length: n }, (_, i) => i);
+  const mid = [];
+  for (let i = 0; i < n; i++) {
+    if (lockFirst && i === 0) continue;
+    if (lockLast && i === n - 1) continue;
+    mid.push(i);
+  }
+  if (lockFirst && lockLast) {
+    const tour = _nnChain(M, 0, mid);
+    tour.push(n - 1);
+    return _twoOptFixedEnds(M, tour);
+  }
+  if (lockFirst) return _twoOptFixedEnds(M, _nnChain(M, 0, mid));
+  if (lockLast)  return _twoOptFixedEnds(M, _nnChain(M, n - 1, mid).reverse());
+  // No pins: try every start, keep the shortest tour.
+  let best = null, bestLen = Infinity;
+  for (let s = 0; s < n; s++) {
+    const others = [];
+    for (let i = 0; i < n; i++) if (i !== s) others.push(i);
+    const tour = _twoOptFixedEnds(M, _nnChain(M, s, others));
+    const len = _tourLen(M, tour);
+    if (len < bestLen) { bestLen = len; best = tour; }
+  }
+  return best;
+}
+
+async function optimiseOrder() {
+  if (selectedStops.length < 3) { showToast('Add at least 3 stops to optimise the order.'); return; }
+
+  const startPin = selectedStops.find(s => s.role === 'start' || s.role === 'startend') || null;
+  const endPin   = selectedStops.find(s => s.role === 'end') || null;
+  const middle   = selectedStops.filter(s => s !== startPin && s !== endPin);
+  if (middle.length < 2) { showToast('Need at least 2 unpinned stops to reorder.'); return; }
+
+  // Matrix order: [start?] + middle + [end?]
+  const ordered = [...(startPin ? [startPin] : []), ...middle, ...(endPin ? [endPin] : [])];
+  const pts = ordered.map(s => [s.lat, s.lng]);
+
+  const btn = document.getElementById('optimiseBtn');
+  if (btn) { btn.textContent = 'Optimising…'; btn.disabled = true; }
+  showToast('Measuring walking distances…');
+
+  const prof = TRAVEL_MODES[travelMode];
+  const res = await apiDistanceMatrix(pts, prof.orsProfile, prof.osrmProfile);
+
+  if (btn) { btn.textContent = 'Optimise order'; btn.disabled = false; }
+  if (!res.ok || !res.matrix) { showToast('Could not get walking distances — order unchanged.'); return; }
+
+  // Sanitise nulls (unreachable pairs) to a large finite cost.
+  const n = ordered.length;
+  const M = res.matrix.map(row => row.map(v => (v == null ? 1e12 : v)));
+
+  pushUndo();
+  const order = _solveOpenTSP(M, n, !!startPin, !!endPin);
+  selectedStops = order.map(i => ordered[i]);
   renderStops();
+  showToast('Stops reordered by shortest walking route. Use "Route all stops" to draw it.');
 }
 
 function setAsStart(idx) {
