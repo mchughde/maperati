@@ -118,18 +118,9 @@ function toggleDraw() {
     const mapClickBtn = document.getElementById("mapClickBtn");
     if (mapClickBtn) { mapClickBtn.disabled = false; mapClickBtn.title = ""; }
   }
-  syncPenPanState();
 }
 
-function setDrawMode(mode) { drawMode = mode; syncPenPanState(); }
-
-// Free-mode freehand drawing is handled by a transparent overlay layer on top
-// of the map (built in init.js), NOT by toggling MapLibre's pan handlers.
-// Toggling dragPan froze the map and made Safari cancel touches; the overlay
-// owns input only while Free mode is active and avoids both problems entirely.
-function syncPenPanState() {
-  if (typeof syncFreeDrawOverlay === 'function') syncFreeDrawOverlay();
-}
+function setDrawMode(mode) { drawMode = mode; }
 
 function toggleDrawDropdown() {
   const dd = document.getElementById("drawDropdown");
@@ -163,7 +154,6 @@ function stopDrawFromMenu() {
 }
 
 async function addRoutePoint(lat, lng) {
-  if (window._pdlog) window._pdlog(`++ addRoutePoint(${lat.toFixed(5)}, ${lng.toFixed(5)})`);
   const prev = routeCoords.length ? routeCoords[routeCoords.length-1] : null;
   let newCoords = [[lat, lng]];
   let segDist = 0;
