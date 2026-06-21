@@ -29,42 +29,50 @@ map.on('load', () => {
     onMapClick({ lngLat, originalEvent, point: { x, y } });
   }
 
-  // Path 1: Safari TouchEvents — touchType:"stylus" identifies Apple Pencil
+  // Path 1: Safari TouchEvents — touchType:"stylus" identifies Apple Pencil.
+  // When touchType is NOT 'stylus' we just return without touching _tapStart —
+  // the pointerdown path may have already set it and we must not clear it.
   _canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) { _tapStart = null; return; }
+    if (e.touches.length !== 1) return;
     const t = e.touches[0];
-    if (t.touchType !== 'stylus') { _tapStart = null; return; }
+    if (t.touchType !== 'stylus') return;
     _tapStart = { x: t.clientX, y: t.clientY, time: Date.now() };
     _pencilTapPending = false;
   }, { passive: true });
 
   _canvas.addEventListener('touchend', (e) => {
-    if (!_tapStart || e.changedTouches.length !== 1) return;
+    if (e.changedTouches.length !== 1) return;
     const t = e.changedTouches[0];
-    if (t.touchType !== 'stylus') { _tapStart = null; return; }
-    const dx = t.clientX - _tapStart.x;
-    const dy = t.clientY - _tapStart.y;
-    const dt = Date.now() - _tapStart.time;
+    if (t.touchType !== 'stylus') return;  // leave _tapStart for pointerup to handle
+    const start = _tapStart;
     _tapStart = null;
-    if (dt > 500 || Math.hypot(dx, dy) > 20) return;
+    if (_pencilTapPending || !start) return;
+    const dt = Date.now() - start.time;
+    if (dt > 500 || Math.hypot(t.clientX - start.x, t.clientY - start.y) > 20) return;
     _firePencilClick(t.clientX, t.clientY, e);
   }, { passive: true });
 
-  // Path 2: Standard PointerEvents — pointerType:"pen"
+  // Path 2: Standard PointerEvents — pointerType:"pen".
+  // Always (re)set _tapStart on pointerdown so each pencil touch gets a fresh baseline.
   _canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'pen') return;
-    if (!_tapStart) _tapStart = { x: e.clientX, y: e.clientY, time: Date.now() };
+    _tapStart = { x: e.clientX, y: e.clientY, time: Date.now() };
     _pencilTapPending = false;
   }, { passive: true });
 
   _canvas.addEventListener('pointerup', (e) => {
-    if (e.pointerType !== 'pen' || _pencilTapPending || !_tapStart) return;
-    const dx = e.clientX - _tapStart.x;
-    const dy = e.clientY - _tapStart.y;
-    const dt = Date.now() - _tapStart.time;
+    if (e.pointerType !== 'pen') return;
+    const start = _tapStart;
     _tapStart = null;
-    if (dt > 500 || Math.hypot(dx, dy) > 20) return;
+    if (_pencilTapPending || !start) return;
+    const dt = Date.now() - start.time;
+    if (dt > 500 || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 20) return;
     _firePencilClick(e.clientX, e.clientY, e);
+  }, { passive: true });
+
+  // Clear stale state if the OS cancels the touch (e.g. system gesture)
+  _canvas.addEventListener('pointercancel', (e) => {
+    if (e.pointerType === 'pen') _tapStart = null;
   }, { passive: true });
 
   // Guard: if we already handled the tap above, skip the native map.click
