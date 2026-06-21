@@ -78,7 +78,7 @@
         Drop a file here, or click to browse
         <strong id="fileLabel"></strong>
         <div style="font-size:0.7rem;color:#aaa;margin-top:4px">CSV · GPX · KML · GeoJSON</div>
-        <input type="file" id="fileInput" accept=".csv,.gpx,.GPX,.kml,.KML,.geojson,.GeoJSON,.json" onchange="handleFile(this.files[0])"/>
+        <input type="file" id="fileInput" onchange="handleFile(this.files[0])"/>
       </div>
 
       <div class="form-row" id="delimRow" style="display:none">
