@@ -73,37 +73,6 @@ map.on("contextmenu", (e) => {
   };
 });
 
-// ── TEMP tap diagnostic (remove once confirmed working) ───
-// "v8 loaded" proves fresh (non-cached) JS is running. Then each tap logs
-// whether it reached onMapClick, and the draw state + route length.
-{
-  const box = document.createElement('div');
-  box.id = 'tapDebug';
-  box.style.cssText =
-    'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:99999;' +
-    'background:rgba(0,0,0,0.85);color:#3f6;font:13px/1.4 monospace;padding:8px 11px;' +
-    'border-radius:8px;max-width:94vw;white-space:pre-wrap;pointer-events:none';
-  box.textContent = 'v8 loaded — turn on Draw (Snap/Free), then tap the map';
-  document.body.appendChild(box);
-
-  const lines = [];
-  const log = (m) => {
-    lines.unshift(new Date().toTimeString().slice(0, 8) + '  ' + m);
-    if (lines.length > 8) lines.pop();
-    box.textContent = lines.join('\n');
-  };
-
-  const c = map.getCanvas();
-  c.addEventListener('pointerdown', (e) => { if (e.pointerType === 'pen') log('pen down'); }, { passive: true });
-  c.addEventListener('pointerup',   (e) => { if (e.pointerType === 'pen') log('pen up'); }, { passive: true });
-
-  const _origOnMapClick = onMapClick;
-  onMapClick = function (e) {
-    log(`onMapClick  draw=${drawing}  mode=${drawMode}  len=${routeCoords.length}`);
-    return _origOnMapClick(e);
-  };
-}
-
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;
