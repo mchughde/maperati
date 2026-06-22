@@ -112,7 +112,7 @@ Vector styles (from OpenFreeMap) render client-side via WebGL and look sharpest,
 - **Reverse route** — reverses the line and swaps stop order.
 - **Clear entire route** — removes the line (stops remain).
 
-**Right-click the map** (desktop) for a context menu:
+**Right-click the map** (desktop) — or **press and hold** it (iPad/touch) — for a context menu:
 - **Open in Street View** — opens Google Street View at that point (always available).
 - **Redo route from here** — trims to the nearest route point and resumes drawing (needs a route).
 - **Route via here** — forces the route through a point with an orange detour marker; tap the marker to remove it (needs a route).

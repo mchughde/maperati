@@ -1,12 +1,18 @@
 # Maperati
 
-A local browser app for planning and exporting walking routes. Built with Flask.
+A browser app for planning and exporting walking routes — draw a route, add and organise stops, and export to GPX/KML/GeoJSON, an image, or text directions.
 
-**Current version: v2** — MapLibre GL JS with vector + raster map styles.
-Open `http://localhost:5001/v2` or run `./start.sh` to launch with the browser opening automatically.
-Full documentation: [v2/README.md](v2/README.md)
+## Versions
 
-**V1** (Leaflet, raster only) remains available at `http://localhost:5001` as a fallback.
+This repo contains **three versions** of the app. **v3 is the current one** — start there unless you have a reason not to.
+
+| Version | Folder | Map engine | Backend | How to run | Notes |
+|---------|--------|-----------|---------|------------|-------|
+| **v3 — current** | `v3/` | MapLibre GL JS | **None** — fully static | Live on GitHub Pages: **https://mchughde.github.io/maperati/v3/** (or serve `v3/` with any static server) | Works on desktop **and iPad** (installable PWA). No server needed. Docs: [v3/README.md](v3/README.md) |
+| v2 | `v2/` | MapLibre GL JS | Flask (`app.py`) | `python3 app.py` → `http://localhost:5001/v2` | Kept as a local fallback while v3 is tested. Docs: [v2/README.md](v2/README.md) |
+| v1 | repo root (`index.html`, `static/`) | Leaflet.js | Flask (`app.py`) | `python3 app.py` → `http://localhost:5001` | The original. Kept as a local fallback. |
+
+**Key difference:** v1 and v2 share the Flask backend in `app.py` and must be run locally; **v3 has no backend** — it calls routing/geocoding services directly from the browser, which is why it (and only it) runs on GitHub Pages and on the iPad. Each version is self-contained in its own folder with its own README/CLAUDE.md — edit only the folder for the version you mean to change.
 
 ---
 
