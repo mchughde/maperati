@@ -12,6 +12,7 @@ dropZone.addEventListener("drop", e => {
 
 async function handleFile(file) {
   if (!file) return;
+  document.getElementById("fileInput").value = "";
   document.getElementById("fileLabel").textContent = file.name;
   document.getElementById("datasetMsg").innerHTML = '<div class="msg info"><span class="spinner">⟳</span> Loading…</div>';
 
