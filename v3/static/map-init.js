@@ -258,8 +258,14 @@ function setupMapDataLayers() {
   map.off('click', 'osm-pois-layer', _onOsmPoiClick);
   map.on('click', 'osm-pois-layer', _onOsmPoiClick);
 
+  // Dataset dot hover tooltip
+  map.off('mouseenter', 'dataset-dots-layer', _onDatasetDotEnter);
+  map.on('mouseenter', 'dataset-dots-layer', _onDatasetDotEnter);
+  map.off('mouseleave', 'dataset-dots-layer', _onDatasetDotLeave);
+  map.on('mouseleave', 'dataset-dots-layer', _onDatasetDotLeave);
+
   // Hover cursors
-  const hoverLayers = ['dataset-dots-layer', 'osm-pois-layer', 'route-line'];
+  const hoverLayers = ['osm-pois-layer', 'route-line'];
   hoverLayers.forEach(id => {
     map.on('mouseenter', id, () => { if (!drawing && !eraseMode) map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', id, () => { if (!drawing && !eraseMode) map.getCanvas().style.cursor = ''; });
@@ -291,12 +297,26 @@ function _onRouteLineClick(e) {
     .addTo(map);
 }
 
+const _dotHoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'dot-hover-popup', offset: 8 });
+
+function _onDatasetDotEnter(e) {
+  if (!e.features.length) return;
+  map.getCanvas().style.cursor = 'pointer';
+  const p = e.features[0].properties;
+  _dotHoverPopup.setLngLat(e.lngLat).setHTML(`<span class="dot-hover-name">${escH(p.name)}</span>`).addTo(map);
+}
+
+function _onDatasetDotLeave() {
+  map.getCanvas().style.cursor = '';
+  _dotHoverPopup.remove();
+}
+
 function _onDatasetDotClick(e) {
   e.preventDefault();
   if (!e.features.length) return;
   const p = e.features[0].properties;
   if (drawing) { addRoutePoint(p.lat, p.lng); }
-  else if (!bboxMode) { addStop(p.name, p.lat, p.lng, p.id); }
+  else if (!bboxMode) { showAddStopPopup(p.lat, p.lng, p.name); }
 }
 
 function _onOsmPoiClick(e) {
