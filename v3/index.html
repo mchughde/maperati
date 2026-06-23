@@ -83,7 +83,7 @@
 
       <div class="form-row" id="delimRow" style="display:none">
         <label>CSV delimiter</label>
-        <select id="delimiter">
+        <select id="delimiter" onchange="if(_lastCsvFile) handleFile(_lastCsvFile)">
           <option value=";">Semicolon ; (Paris open data)</option>
           <option value=",">Comma ,</option>
           <option value="&#9;">Tab</option>
@@ -305,7 +305,7 @@
 <script src="static/elevation.js?v=12"></script>
 <script src="static/routing.js?v=12"></script>
 <script src="static/stops.js?v=12"></script>
-<script src="static/import.js?v=13"></script>
+<script src="static/import.js?v=14"></script>
 <script src="static/exports.js?v=12"></script>
 <script src="static/discover.js?v=12"></script>
 <script src="static/ui.js?v=12"></script>

@@ -1,5 +1,7 @@
 // ═══ File import, filtering, bbox area ═══════════════════
 
+let _lastCsvFile = null;
+
 // ── Drop zone ─────────────────────────────────────────────
 
 const dropZone = document.getElementById("dropZone");
@@ -19,7 +21,7 @@ async function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   document.getElementById("delimRow").style.display = ext === 'csv' ? "block" : "none";
 
-  if      (ext === 'csv')     await loadCSV(file);
+  if      (ext === 'csv')     { _lastCsvFile = file; await loadCSV(file); }
   else if (ext === 'gpx')     await loadGPX(file);
   else if (ext === 'kml')     await loadKML(file);
   else if (ext === 'geojson') await loadGeoJSONFile(file);
