@@ -229,7 +229,7 @@ function setupMapDataLayers() {
       id: 'dataset-dots-layer',
       type: 'circle',
       source: 'dataset-dots',
-      paint: { 'circle-radius': 4, 'circle-color': '#ccc', 'circle-stroke-color': '#aaa', 'circle-stroke-width': 1 },
+      paint: { 'circle-radius': 5, 'circle-color': '#f97316', 'circle-stroke-color': '#ea580c', 'circle-stroke-width': 1.5, 'circle-opacity': 0.85 },
     });
   }
 
