@@ -162,7 +162,24 @@ function computeStopCumulDists() {
 
 // ── Render stops list ─────────────────────────────────────
 
+// Enforce the route-order invariant: a Start (or loop) stop is always first and
+// an End stop is always last. Repairs sessions saved before role-assignment
+// reordered the list, so "Route to next" chains in the correct order.
+function normalizeStopOrder() {
+  const startIdx = selectedStops.findIndex(s => s.role === 'start' || s.role === 'startend');
+  if (startIdx > 0) {
+    const [s] = selectedStops.splice(startIdx, 1);
+    selectedStops.unshift(s);
+  }
+  const endIdx = selectedStops.findIndex(s => s.role === 'end');
+  if (endIdx !== -1 && endIdx !== selectedStops.length - 1) {
+    const [s] = selectedStops.splice(endIdx, 1);
+    selectedStops.push(s);
+  }
+}
+
 function renderStops() {
+  normalizeStopOrder();
   const list  = document.getElementById("stopList");
   const empty = document.getElementById("emptyState");
   const badge = document.getElementById("stopCountBadge");
