@@ -92,11 +92,12 @@ Vector styles (from OpenFreeMap) render client-side via WebGL and look sharpest,
 
 ### Stop roles (⋯ menu on each stop)
 - **Start** — green pill · **End** — red pill · **Start & End** — split green/red pill for loop routes.
+- Setting a role also moves the stop to the right place in the list: **Start** jumps to the top, **End** to the bottom. The list order is the route order.
 
 ### Working with the stop list
 - **Drag to reorder** with the ⠿ handle (touch: press and hold, then drag).
 - **Rename** (✎), set **role/category** (⋯), add a **note**, or **remove** (×).
-- **Route to next** appears between consecutive stops — routes that leg along roads.
+- **Route to next** appears between consecutive stops — routes that leg along roads and stitches it into the right place in the existing line by stop order (so you can add a **Start** or **End** *after* drawing the rest of the route, then route just that leg — no need to clear and start over).
 - **Route all stops** (footer) routes every consecutive pair in order.
 - **Optimise order** (footer, with 3+ stops) reorders your stops into the shortest **walking** route between them using real road distances (ORS/OSRM); then press *Route all stops* to draw it. Any stop you’ve pinned as **Start**, **End**, or loop point stays in place — only the stops in between are reordered.
 - **Locate** — tap a stop’s badge in the sidebar to pan to it.
@@ -264,4 +265,4 @@ v3/
 
 ## Caching
 
-Every asset link in `index.html` carries a `?v=N` query (currently `?v=10`). **Bump `N` on every JS/CSS change** — otherwise Safari may serve stale files, which looks like a bug.
+Every asset link in `index.html` carries a `?v=N` query (bumped per file as it changes). **Bump the `?v=N` on every JS/CSS file you edit** — otherwise Safari may serve stale files, which looks like a bug. (Cached files masquerading as bugs is a recurring gotcha: confirm the loaded version before chasing a "still broken" report.)
