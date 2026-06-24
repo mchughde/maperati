@@ -1,5 +1,48 @@
 // ═══ Segment routing ═════════════════════════════════════
 
+// Which stop is a given route coordinate closest to (by index in selectedStops)?
+function _nearestStopIdxToCoord(coord) {
+  let best = -1, bd = Infinity;
+  selectedStops.forEach((s, i) => {
+    const d = (s.lat - coord[0]) ** 2 + (s.lng - coord[1]) ** 2;
+    if (d < bd) { bd = d; best = i; }
+  });
+  return best;
+}
+
+// Smart-insert a routed leg (coords, connecting stop[idx]→stop[toIdx]) into the
+// existing route at the position that matches stop order — prepend the front
+// leg, append the end leg, otherwise splice into the middle. Keeps routeSegments
+// total in sync with routeCoords so undo/detours stay consistent.
+function insertLegIntoRoute(coords, idx, toIdx) {
+  if (routeCoords.length === 0) {
+    routeCoords.push(...coords);
+    routeSegments.push(coords.length);
+    return;
+  }
+  const firstStop = _nearestStopIdxToCoord(routeCoords[0]);
+  const lastStop  = _nearestStopIdxToCoord(routeCoords[routeCoords.length - 1]);
+  if (idx >= lastStop) {
+    // Append after the current end (drop duplicate first point).
+    const seg = coords.slice(1);
+    routeCoords.push(...seg);
+    routeSegments.push(seg.length);
+  } else if (toIdx <= firstStop) {
+    // Prepend before the current start (drop duplicate last point).
+    const seg = coords.slice(0, -1);
+    routeCoords.unshift(...seg);
+    routeSegments.unshift(seg.length);
+  } else {
+    // Replace the stretch between the nearest route points to a and b.
+    const a = selectedStops[idx], b = selectedStops[toIdx];
+    const ia = findNearestRouteIndex(a.lat, a.lng);
+    const ib = findNearestRouteIndex(b.lat, b.lng);
+    const lo = Math.min(ia, ib), hi = Math.max(ia, ib);
+    routeCoords.splice(lo, hi - lo + 1, ...coords);
+    routeSegments = [routeCoords.length];
+  }
+}
+
 async function routeSegmentToNext(idx, toIdx) {
   if (toIdx === undefined) toIdx = idx + 1;
   if (toIdx >= selectedStops.length) return;
@@ -27,11 +70,9 @@ async function routeSegmentToNext(idx, toIdx) {
       return;
     }
     const coords = (data.ok && data.coords.length > 1) ? data.coords : [[a.lat,a.lng],[b.lat,b.lng]];
-    const segCoords = routeCoords.length > 0 ? coords.slice(1) : coords;
-    routeCoords.push(...segCoords);
-    routeSegments.push(segCoords.length);
+    insertLegIntoRoute(coords, idx, toIdx);
     dotMarkers.push(null);
-    routeDistM += data.distance_m || calcDist(segCoords);
+    routeDistM = calcDist(routeCoords);
     redrawRoute();
     updateRouteStats();
     syncEditMenu();
