@@ -69,7 +69,7 @@ function confirmAddStop() {
   if (isEnd   || isStartEnd) selectedStops.forEach(s => { if (s.role === "end"   || s.role === "startend") s.role = null; });
   if (isStart || isStartEnd) {
     selectedStops.unshift(stop);
-  } else if (stop.category && routeCoords.length > 1) {
+  } else if (!isEnd && stop.category && routeCoords.length > 1) {
     insertStopByProximity(stop);
   } else {
     selectedStops.push(stop);
@@ -251,6 +251,15 @@ function renderStops() {
         for (let j = i + 1; j < selectedStops.length; j++) {
           if (!selectedStops[j].category) { nextNumIdx = j; break; }
         }
+        // If the next non-category stop is an End/startend role stop and there are
+        // numbered stops beyond it, skip to the first numbered stop instead.
+        if (nextNumIdx !== -1 && (selectedStops[nextNumIdx].role === 'end' || selectedStops[nextNumIdx].role === 'startend')) {
+          for (let j = nextNumIdx + 1; j < selectedStops.length; j++) {
+            if (!selectedStops[j].category && selectedStops[j].role !== 'end' && selectedStops[j].role !== 'startend') {
+              nextNumIdx = j; break;
+            }
+          }
+        }
         if (nextNumIdx !== -1) {
           const connector = document.createElement('div');
           connector.className = 'stop-connector';
@@ -296,6 +305,13 @@ function setStopRole(i, role) {
   if (role === 'start' || role === 'startend') selectedStops.forEach(s => { if (s.role === 'start' || s.role === 'startend') s.role = null; });
   if (role === 'end'   || role === 'startend') selectedStops.forEach(s => { if (s.role === 'end'   || s.role === 'startend') s.role = null; });
   selectedStops[i].role = role;
+  if (role === 'start' || role === 'startend') {
+    const [stop] = selectedStops.splice(i, 1);
+    selectedStops.unshift(stop);
+  } else if (role === 'end') {
+    const [stop] = selectedStops.splice(i, 1);
+    selectedStops.push(stop);
+  }
   renderStops();
   saveSession();
 }
