@@ -489,3 +489,61 @@ function printMap() {
   map.once('idle', () => setTimeout(doPrint, 300));
   setTimeout(doPrint, 4000);
 }
+
+// ═══ Embed / Share ════════════════════════════════════════
+// Encodes the current route+stops into an embed.html link so the map can be
+// dropped into any website. Everything lives in the URL fragment — no backend.
+
+function buildShareUrl() {
+  const payload = encodeShareState({
+    name: getExportName(),
+    travelMode,
+    styleId: currentStyleId,
+    routeCoords,
+    stops: selectedStops,
+  });
+  const embedBase = new URL('embed.html', window.location.href).href;
+  return embedBase + '#' + payload;
+}
+
+function openEmbedModal() {
+  toggleExportDropdown();  // close the export menu
+  if (!routeCoords.length && !selectedStops.length) {
+    showToast('Nothing to share yet — add stops or draw a route.');
+    return;
+  }
+  const url = buildShareUrl();
+  const iframe =
+    `<iframe src="${escH(url)}" width="100%" height="480" style="border:0;border-radius:12px" `
+    + `loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
+  document.getElementById('embedLinkInput').value = url;
+  document.getElementById('embedCodeInput').value = iframe;
+  const warn = document.getElementById('embedLenWarn');
+  warn.style.display = url.length > 8000 ? 'block' : 'none';
+  document.getElementById('embedOverlay').style.display = 'flex';
+}
+
+function closeEmbedModal() {
+  document.getElementById('embedOverlay').style.display = 'none';
+}
+
+function openEmbedPreview() {
+  window.open(document.getElementById('embedLinkInput').value, '_blank', 'noopener');
+}
+
+function _copyField(id, label) {
+  const el = document.getElementById(id);
+  el.select();
+  el.setSelectionRange(0, el.value.length);
+  const done = () => showToast(label + ' copied to clipboard.');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(el.value).then(done, () => { document.execCommand('copy'); done(); });
+  } else {
+    document.execCommand('copy');
+    done();
+  }
+}
+
+function copyEmbedCode() { _copyField('embedCodeInput', 'Embed code'); }
+function copyEmbedLink() { _copyField('embedLinkInput', 'Link'); }

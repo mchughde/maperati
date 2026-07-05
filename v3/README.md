@@ -1,6 +1,6 @@
 # Maperati v3
 
-A browser app for planning and exporting walking routes in Paris (and anywhere else). Draw a route by tapping the map, add and organise stops, and export to GPX/KML/GeoJSON, an image, or street-by-street text directions.
+A browser app for planning and exporting walking routes in Paris (and anywhere else). Draw a route by tapping the map, add and organise stops, and export to GPX/KML/GeoJSON, an image, street-by-street text directions, or an embeddable interactive map you can drop into any website.
 
 **v3 is a fully static app — there is no server or backend.** It runs entirely in the browser and is hosted on GitHub Pages, so it also works on an iPad (including "Add to Home Screen"). All routing, geocoding, and map data come from public web services called directly from the browser.
 
@@ -141,9 +141,9 @@ Switching mode after drawing shows a toast to re-draw, since the routing profile
 
 **Discover** searches OpenStreetMap for places in the current map view via the Overpass API.
 
-Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market.
+Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market, Metro, Toilets.
 
-Results appear as **purple dots** — tap one to open the add-stop popup (name pre-filled), or **Clear** to remove them. Primary endpoint `overpass-api.de`, falling back to `overpass.kumi.systems` on timeout.
+Results appear as **purple dots** — tap one to open the add-stop popup (name pre-filled), or **Clear** to remove them. Primary endpoint `overpass-api.de`, falling back to `overpass.kumi.systems` on timeout. (Metro dots are named stations; public toilets are often unnamed and show as `Place (id)`.)
 
 ---
 
@@ -173,7 +173,29 @@ All exports run in the browser. Open **Export ▾** (header), set a file name, t
 - **CSV stops** — stop list with lat/lng, role/category, notes.
 - **Text directions** — street-by-street directions **derived from your drawn line** (not re-routed between stops). Street names are looked up from OpenStreetMap, so it shows `Building… n/n` progress for a few seconds, then offers the file (on iPad, tap the **“Directions ready — tap to save”** link). Needs at least 2 stops and a drawn route.
 - **Image (JPG)** — optionally **Set image area** (drag a rectangle), pick a **Print quality** (Screen / 2× / 3×), then **Export image (JPG)**. Vector styles benefit most from higher quality; raster styles gain less.
+- **Embed / share on a website** — generates a copy-paste `<iframe>` snippet and a direct link that show your route in a read-only interactive map. The whole route lives inside the link (no account or server), so it works anywhere you can paste HTML. **Preview** opens it in a new tab. See [Embedding on a website](#embedding-on-a-website).
 - **Save session file** — a `.json` snapshot of everything (route, stops, names, roles, notes, detours, map position). Drop it back into Import to restore exactly.
+
+---
+
+## Embedding on a website
+
+**Export ▾ → Embed / share on a website** turns your current route into a read-only interactive map you can put on any web page.
+
+- **Embed code** — a copy-paste `<iframe>` snippet. Paste it into any site or CMS and visitors get a live map they can pan, zoom, and tap (stops show their names). They can't edit.
+- **Direct link** — the same map as its own page (`embed.html`), handy for sharing or opening full-screen.
+- **Preview** opens the embed in a new tab so you can check it before copying.
+
+How it works: the entire route (line + stops + basemap choice) is encoded into the link itself — there is no Maperati server storing it. Because v3 is static, this keeps everything self-contained; the generated link points at wherever the app is hosted (e.g. the GitHub Pages `embed.html`).
+
+Optional URL tweaks you can append to an embed link:
+
+| Add to the link | Effect |
+|-----------------|--------|
+| `?static=1` (before the `#`) | Locks the map — no drag/zoom, just a fixed picture of the route |
+| `?stats=0` (before the `#`) | Hides the distance/time pill |
+
+**Note:** very long routes make a long link. The dialog warns you past ~8000 characters — most browsers and platforms handle it, but a few CMSes cap URL length, in which case simplify the route.
 
 ---
 
@@ -241,6 +263,7 @@ Your route, stops, and ORS key stay in your browser’s `localStorage`. Exported
 ```
 v3/
 ├── index.html        ← markup + script tags (load order matters)
+├── embed.html        ← standalone read-only viewer for website embeds
 ├── manifest.json     ← PWA manifest (Add to Home Screen)
 ├── icon-192.svg      ← app icon
 ├── README.md         ← this file
@@ -249,6 +272,7 @@ v3/
     ├── app.css           ← all styles
     ├── styles-config.js  ← map style registry
     ├── state.js          ← globals, CATEGORIES, TRAVEL_MODES, helpers
+    ├── share.js          ← embed-link encode/decode (shared by app + embed.html)
     ├── api.js            ← ORS/OSRM/Nominatim calls + directions pipeline
     ├── map-init.js       ← MapLibre map, controls, GeoJSON layers
     ├── icons.js          ← marker elements + renderStopMarkers
@@ -257,9 +281,10 @@ v3/
     ├── routing.js        ← route-between-stops helpers
     ├── stops.js          ← stop CRUD, geocode, drag-reorder
     ├── import.js         ← file parsing, filters, area/print rectangles
-    ├── exports.js        ← all exports + image/print
+    ├── exports.js        ← all exports + image/print + embed/share
     ├── discover.js       ← Overpass POI search
     ├── ui.js             ← sidebar, dropdowns, session, ORS-key modal
+    ├── embed.js          ← embed.html viewer logic
     └── init.js           ← wires events; restores session (loads last)
 ```
 

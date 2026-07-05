@@ -46,6 +46,7 @@
       </div>
       <button class="btn btn-secondary btn-block" onclick="exportMapImage();toggleExportDropdown()" style="margin-bottom:6px">Export image (JPG)</button>
       <div style="height:1px;background:#D0E3FF;margin:6px 0"></div>
+      <button class="btn btn-secondary btn-block" onclick="openEmbedModal()" style="margin-bottom:6px">Embed / share on a website</button>
       <button class="btn btn-secondary btn-block" onclick="saveSessionFile()" style="font-size:0.76rem">Save session file</button>
       <div id="exportMsg" style="margin-top:6px"></div>
     </div>
@@ -165,6 +166,8 @@
           <button class="osm-cat-btn" onclick="searchOsmCategory('leisure=garden','way',this)">Garden</button>
           <button class="osm-cat-btn" onclick="searchOsmCategory('historic=monument','node',this)">Monument</button>
           <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=marketplace','node',this)">Market</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('station=subway','node',this)">Metro</button>
+          <button class="osm-cat-btn" onclick="searchOsmCategory('amenity=toilets','node',this)">Toilets</button>
         </div>
       </div>
       <div id="osmSearchMsg"></div>
@@ -294,10 +297,44 @@
   </div>
 </div>
 
+<!-- Embed / share modal -->
+<div id="embedOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:26px 26px 22px;width:min(560px,92vw);box-shadow:0 8px 40px rgba(0,0,0,0.18);font-family:inherit;max-height:90vh;overflow:auto">
+    <div style="font-size:1rem;font-weight:700;color:#1A1D2E;margin-bottom:6px">Embed this map on a website</div>
+    <div style="font-size:0.78rem;color:#6878A0;margin-bottom:16px;line-height:1.5">
+      Paste this code into any web page to show your route in an interactive map.
+      The whole route is stored inside the link — no account or server needed.
+    </div>
+
+    <div style="font-size:0.72rem;font-weight:600;color:#4B4542;margin-bottom:6px">Embed code (iframe)</div>
+    <textarea id="embedCodeInput" readonly rows="3"
+      style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #D0E3FF;border-radius:8px;font-size:0.72rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;resize:vertical;color:#1A1D2E"></textarea>
+    <div style="display:flex;gap:8px;margin:6px 0 14px">
+      <button class="btn" style="background:#2563EB;color:#fff" onclick="copyEmbedCode()">Copy embed code</button>
+      <button class="btn btn-secondary" onclick="openEmbedPreview()">Preview</button>
+    </div>
+
+    <div style="font-size:0.72rem;font-weight:600;color:#4B4542;margin-bottom:6px">Direct link</div>
+    <input id="embedLinkInput" type="text" readonly
+      style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #D0E3FF;border-radius:8px;font-size:0.72rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;color:#1A1D2E;margin-bottom:6px"/>
+    <button class="btn btn-secondary btn-sm" onclick="copyEmbedLink()">Copy link</button>
+
+    <div id="embedLenWarn" style="display:none;margin-top:12px;font-size:0.73rem;color:#b45309;line-height:1.5">
+      This route is long, so the link is large. Most browsers handle it, but some
+      website platforms limit URL length — if the embed fails to load, simplify the route.
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-secondary" onclick="closeEmbedModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- styles-config.js must be first (defines MAP_STYLES before map-init.js runs) -->
 <script src="static/styles-config.js?v=12"></script>
 <!-- state.js declares all globals; api.js must come before drawing/routing/elevation -->
 <script src="static/state.js?v=12"></script>
+<script src="static/share.js?v=1"></script>
 <script src="static/api.js?v=12"></script>
 <script src="static/map-init.js?v=14"></script>
 <script src="static/icons.js?v=12"></script>
@@ -306,7 +343,7 @@
 <script src="static/routing.js?v=13"></script>
 <script src="static/stops.js?v=15"></script>
 <script src="static/import.js?v=14"></script>
-<script src="static/exports.js?v=12"></script>
+<script src="static/exports.js?v=13"></script>
 <script src="static/discover.js?v=12"></script>
 <script src="static/ui.js?v=12"></script>
 <!-- init.js wires map events and restores session via map.on('load') -->

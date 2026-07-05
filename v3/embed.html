@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Maperati — Map</title>
+<link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet"/>
+<script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #map { position: absolute; inset: 0; }
+  #statsPill {
+    display: none;
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 5; background: #fff; border: 1.5px solid #D0E3FF; border-radius: 20px;
+    padding: 6px 14px; font-size: 0.8rem; color: #1A1D2E; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  }
+  #statsPill strong { color: #2563EB; }
+  #brand {
+    position: absolute; bottom: 8px; left: 8px; z-index: 5;
+    background: rgba(255,255,255,0.9); border-radius: 6px; padding: 3px 8px;
+    font-size: 0.68rem; font-weight: 600; color: #2563EB; text-decoration: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  }
+  #embedError {
+    display: none; position: absolute; inset: 0; z-index: 10;
+    align-items: center; justify-content: center; text-align: center;
+    background: #F5F8FF; color: #6878A0; padding: 24px;
+    font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="statsPill"></div>
+  <a id="brand" href="https://mchughde.github.io/maperati/v3/" target="_blank" rel="noopener">Maperati</a>
+  <div id="embedError"></div>
+
+  <script src="static/styles-config.js?v=13"></script>
+  <script src="static/state.js?v=13"></script>
+  <script src="static/share.js?v=1"></script>
+  <script src="static/embed.js?v=1"></script>
+</body>
+</html>
