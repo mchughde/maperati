@@ -14,42 +14,6 @@ function download(content, filename, mime) {
   a.remove();
 }
 
-// iPad-safe download for content produced AFTER an async step (e.g. directions,
-// which reverse-geocode street names first). On iOS a programmatic click is
-// ignored once the original tap gesture has expired, so we also surface a
-// visible link the user can tap — routed through the native share sheet
-// ("Save to Files") when available. Desktop still auto-downloads immediately.
-function offerDownload(content, filename, mime, container) {
-  const url = URL.createObjectURL(new Blob([content], { type: mime }));
-
-  // Desktop: auto-download (no gesture requirement for <a download> there).
-  const auto = document.createElement('a');
-  auto.href = url; auto.download = filename;
-  document.body.appendChild(auto); auto.click(); auto.remove();
-
-  // iPad/iOS: visible, tappable fallback (a fresh gesture makes the save work).
-  if (container) {
-    container.innerHTML = '';
-    const link = document.createElement('a');
-    link.href = url; link.download = filename;
-    link.textContent = 'Directions ready — tap to save ' + filename;
-    link.className = 'msg info';
-    link.style.cssText = 'display:block;text-decoration:none;cursor:pointer';
-    link.addEventListener('click', async (ev) => {
-      try {
-        if (navigator.canShare) {
-          const file = new File([content], filename, { type: mime });
-          if (navigator.canShare({ files: [file] })) {
-            ev.preventDefault();
-            await navigator.share({ files: [file], title: filename });
-          }
-        }
-      } catch (_) { /* fall back to the link's default download */ }
-    });
-    container.appendChild(link);
-  }
-}
-
 async function exportAs(fmt) {
   const name = getExportName();
   const msg  = document.getElementById("exportMsg");
@@ -62,7 +26,6 @@ async function exportAs(fmt) {
   if (fmt === "gpx")        exportGPX(name);
   if (fmt === "kml")        exportKML(name);
   if (fmt === "csv")        exportCSV(name);
-  if (fmt === "directions") await exportDirections(name);
 }
 
 function exportGeoJSON(name) {
@@ -145,146 +108,6 @@ function exportCSV(name) {
 
 function escXml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-function sampleRouteSegment(coords, maxPts = 12) {
-  if (coords.length <= maxPts) return coords;
-  const step = (coords.length - 1) / (maxPts - 1);
-  return Array.from({length: maxPts}, (_, i) => coords[Math.round(i * step)]);
-}
-
-async function exportDirections(name) {
-  const msg = document.getElementById("exportMsg");
-  if (!selectedStops.length) {
-    msg.innerHTML = '<div class="msg warn">Add stops first to export directions.</div>';
-    return;
-  }
-  if (selectedStops.length < 2) {
-    msg.innerHTML = '<div class="msg warn">Add at least 2 stops to export directions.</div>';
-    return;
-  }
-  if (!routeCoords.length) {
-    msg.innerHTML = '<div class="msg warn">Draw a route first to export directions.</div>';
-    return;
-  }
-  msg.innerHTML = '<div class="msg info"><span class="spinner">⟳</span> Fetching street-by-street directions…</div>';
-
-  const sep = "─".repeat(52);
-  let txt = `WALKING DIRECTIONS: ${name.toUpperCase()}\n${sep}\n\n`;
-
-  const totalDist = routeDistM || (routeCoords.length > 1 ? calcDist(routeCoords) : 0);
-  if (totalDist > 0) {
-    txt += `Total distance:  ~${(totalDist / 1000).toFixed(2)} km\n`;
-    txt += `Estimated time:  ~${Math.round(totalDist / TRAVEL_MODES[travelMode].speedMpm)} min at ${TRAVEL_MODES[travelMode].label.toLowerCase()} pace\n\n`;
-  }
-  txt += sep + "\n\n";
-
-  let matchSteps = null;
-  try {
-    const data = await apiMatchDirections(
-      routeCoords,
-      selectedStops.map(s => ({ name: s.name, lat: s.lat, lng: s.lng })),
-      (done, total) => {
-        msg.innerHTML = `<div class="msg info"><span class="spinner">⟳</span> Building street-by-street directions… ${done}/${total}</div>`;
-      }
-    );
-    if (data?.ok && data.steps?.length) matchSteps = data.steps;
-  } catch (_) {}
-
-  let _n = 0;
-  const stopNumbers = selectedStops.map(s =>
-    (s.role === 'start' || s.role === 'end' || s.role === 'startend') ? null : ++_n
-  );
-
-  if (matchSteps) {
-    const filtered = matchSteps.filter(step =>
-      step.stop_index !== undefined ||
-      (step.instruction && (step.distance_m || 0) >= 30)
-    );
-    const merged = [];
-    for (const step of filtered) {
-      const prev = merged[merged.length - 1];
-      if (prev &&
-          step.stop_index === undefined && prev.stop_index === undefined &&
-          step.street_name && step.street_name !== '-' &&
-          step.street_name === prev.street_name) {
-        prev.distance_m += step.distance_m || 0;
-      } else {
-        merged.push({ ...step });
-      }
-    }
-    for (const step of merged) {
-      if (step.stop_index !== undefined) {
-        const s = selectedStops[step.stop_index];
-        if (!s) continue;
-        const isLast  = step.stop_index === selectedStops.length - 1;
-        const onRoute = distToRoute(s) <= 120;
-        if (onRoute) {
-          txt += "\n";
-          const label = s.role === 'start'    ? 'START'       :
-                        s.role === 'end'      ? 'END'         :
-                        s.role === 'startend' ? 'START / END' :
-                        `STOP ${stopNumbers[step.stop_index]}`;
-          txt += `${label}  —  ${s.name}\n`;
-          if (s.notes) txt += `  Note: ${s.notes}\n`;
-          if (isLast)  txt += "(final destination)\n";
-          txt += "\n";
-        }
-        if (!isLast && step.instruction && step.street_name && step.street_name !== '-' && (step.distance_m || 0) >= 30) {
-          const d    = step.distance_m || 0;
-          const dist = d >= 20 ? ` (${d >= 1000 ? ((d/1000).toFixed(1)+' km') : (Math.round(d)+' m')})` : '';
-          txt += `  ${step.instruction}${dist}\n`;
-        }
-      } else {
-        const inst = step.instruction || '';
-        const d    = step.distance_m  || 0;
-        const dist = d >= 20 ? ` (${d >= 1000 ? ((d/1000).toFixed(1)+' km') : (Math.round(d)+' m')})` : '';
-        if (inst) txt += `  ${inst}${dist}\n`;
-      }
-    }
-  } else {
-    for (let i = 0; i < selectedStops.length; i++) {
-      const s     = selectedStops[i];
-      const label = s.role === 'start'    ? 'START'       :
-                    s.role === 'end'      ? 'END'         :
-                    s.role === 'startend' ? 'START / END' :
-                    `STOP ${stopNumbers[i]}`;
-      txt += `${label}  —  ${s.name}\n`;
-      if (s.notes) txt += `  Note: ${s.notes}\n`;
-      if (i < selectedStops.length - 1) {
-        const next = selectedStops[i + 1];
-        const d    = straightLineDist(s, next);
-        txt += `${"─".repeat(36)}\n`;
-        txt += `~${(d / 1000).toFixed(2)} km · ~${Math.round(d / TRAVEL_MODES[travelMode].speedMpm)} min (straight-line estimate)\n`;
-        txt += `\n  → ${next.name}\n`;
-      } else {
-        txt += "(final destination)\n";
-      }
-      txt += "\n";
-    }
-  }
-
-  txt += sep + "\n";
-  txt += `Generated by Maperati · ${new Date().toLocaleDateString()}\n`;
-  txt += "Map data © OpenStreetMap contributors\n";
-  offerDownload(txt, name + "_directions.txt", "text/plain", msg);
-}
-
-function distToRoute(stop) {
-  let min = Infinity;
-  for (const c of routeCoords) {
-    const d = straightLineDist(stop, { lat: c[0], lng: c[1] });
-    if (d < min) min = d;
-  }
-  return min;
-}
-
-function straightLineDist(a, b) {
-  const R = 6371000;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
 }
 
 function saveSessionFile() {

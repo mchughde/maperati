@@ -33,7 +33,6 @@
         <button class="btn btn-secondary" onclick="exportAs('kml')">KML</button>
         <button class="btn btn-secondary" onclick="exportAs('csv')">CSV stops</button>
       </div>
-      <button class="btn btn-secondary btn-block" onclick="exportAs('directions')" style="margin-bottom:6px">Text directions</button>
       <button class="btn btn-secondary btn-block" id="printAreaBtn" onclick="togglePrintAreaMode();toggleExportDropdown()" style="margin-bottom:4px">Set image area</button>
       <button class="btn btn-secondary btn-block" id="clearPrintAreaBtn" onclick="clearPrintArea()" style="display:none;margin-bottom:4px">Clear area</button>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
@@ -335,7 +334,7 @@
 <!-- state.js declares all globals; api.js must come before drawing/routing/elevation -->
 <script src="static/state.js?v=12"></script>
 <script src="static/share.js?v=1"></script>
-<script src="static/api.js?v=12"></script>
+<script src="static/api.js?v=13"></script>
 <script src="static/map-init.js?v=14"></script>
 <script src="static/icons.js?v=12"></script>
 <script src="static/drawing.js?v=12"></script>
@@ -343,7 +342,7 @@
 <script src="static/routing.js?v=13"></script>
 <script src="static/stops.js?v=15"></script>
 <script src="static/import.js?v=14"></script>
-<script src="static/exports.js?v=13"></script>
+<script src="static/exports.js?v=14"></script>
 <script src="static/discover.js?v=12"></script>
 <script src="static/ui.js?v=12"></script>
 <!-- init.js wires map events and restores session via map.on('load') -->

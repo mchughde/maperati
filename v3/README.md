@@ -1,6 +1,6 @@
 # Maperati v3
 
-A browser app for planning and exporting walking routes in Paris (and anywhere else). Draw a route by tapping the map, add and organise stops, and export to GPX/KML/GeoJSON, an image, street-by-street text directions, or an embeddable interactive map you can drop into any website.
+A browser app for planning and exporting walking routes in Paris (and anywhere else). Draw a route by tapping the map, add and organise stops, and export to GPX/KML/GeoJSON, an image, or an embeddable interactive map you can drop into any website. For turn-by-turn navigation, export a **GPX track** and open it in a nav app such as OsmAnd.
 
 **v3 is a fully static app — there is no server or backend.** It runs entirely in the browser and is hosted on GitHub Pages, so it also works on an iPad (including "Add to Home Screen"). All routing, geocoding, and map data come from public web services called directly from the browser.
 
@@ -30,7 +30,6 @@ Click **API key** in the header to paste a free [OpenRouteService](https://openr
 - The key is saved **only in your browser** (`localStorage`) and never leaves your device or goes into the repo.
 - **With a key:** road-snapping, routing, and the elevation profile use ORS, which has the best coverage in central Paris.
 - **Without a key:** snapping and routing automatically fall back to the public **OSRM** service (works, but has gaps around Place de la Concorde and parts of Rue de Rivoli). The **elevation profile requires a key**.
-- **Text directions do not need a key** (street names come from OpenStreetMap’s Nominatim).
 
 Use the **API key** button again at any time to change or remove the saved key.
 
@@ -168,10 +167,9 @@ After a CSV/GeoJSON import you also get: **arrondissement filter** (Paris), **na
 All exports run in the browser. Open **Export ▾** (header), set a file name, then choose:
 
 - **GeoJSON** — route line + stops with colours.
-- **GPX** — route track + waypoints with notes.
+- **GPX** — your drawn line as a `<trk>` **track** (point-by-point), plus stops as `<wpt>` waypoints with notes. The track is written whenever a route line exists; import it into a nav app such as **OsmAnd** (choose *navigate along track*) for turn-by-turn that follows your exact line. This replaces the old in-app text directions.
 - **KML** — route + placemarks for Google Earth/Maps.
 - **CSV stops** — stop list with lat/lng, role/category, notes.
-- **Text directions** — street-by-street directions **derived from your drawn line** (not re-routed between stops). Street names are looked up from OpenStreetMap, so it shows `Building… n/n` progress for a few seconds, then offers the file (on iPad, tap the **“Directions ready — tap to save”** link). Needs at least 2 stops and a drawn route.
 - **Image (JPG)** — optionally **Set image area** (drag a rectangle), pick a **Print quality** (Screen / 2× / 3×), then **Export image (JPG)**. Vector styles benefit most from higher quality; raster styles gain less.
 - **Embed / share on a website** — generates a copy-paste `<iframe>` snippet and a direct link that show your route in a read-only interactive map. The whole route lives inside the link (no account or server), so it works anywhere you can paste HTML. **Preview** opens it in a new tab. See [Embedding on a website](#embedding-on-a-website).
 - **Save session file** — a `.json` snapshot of everything (route, stops, names, roles, notes, detours, map position). Drop it back into Import to restore exactly.
@@ -229,7 +227,7 @@ Everything runs client-side; there is no Maperati server. The app talks directly
 | OpenStreetMap / CartoDB / ESRI | Raster map tiles |
 | OpenRouteService (ORS) | Snapping, routing, elevation, distance matrix (with your key) |
 | OSRM | Routing & distance-matrix fallback (no key) |
-| Nominatim (OpenStreetMap) | Place search + street names for directions |
+| Nominatim (OpenStreetMap) | Place search (geocoding) |
 | Overpass | Discover POI search |
 
 Your route, stops, and ORS key stay in your browser’s `localStorage`. Exported files are generated and downloaded locally.
@@ -273,7 +271,7 @@ v3/
     ├── styles-config.js  ← map style registry
     ├── state.js          ← globals, CATEGORIES, TRAVEL_MODES, helpers
     ├── share.js          ← embed-link encode/decode (shared by app + embed.html)
-    ├── api.js            ← ORS/OSRM/Nominatim calls + directions pipeline
+    ├── api.js            ← ORS/OSRM/Nominatim calls (snap, route, matrix, geocode)
     ├── map-init.js       ← MapLibre map, controls, GeoJSON layers
     ├── icons.js          ← marker elements + renderStopMarkers
     ├── drawing.js        ← draw modes, undo/redo, erase, detours
