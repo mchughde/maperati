@@ -140,9 +140,9 @@ Switching mode after drawing shows a toast to re-draw, since the routing profile
 
 **Discover** searches OpenStreetMap for places in the current map view via the Overpass API.
 
-Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market, Metro, Toilets.
+Categories: Cafe, Restaurant, Museum, Church, Park, Garden, Monument, Market, Metro, Accommodation.
 
-Results appear as **purple dots** — tap one to open the add-stop popup (name pre-filled), or **Clear** to remove them. Primary endpoint `overpass-api.de`, falling back to `overpass.kumi.systems` on timeout. (Metro dots are named stations; public toilets are often unnamed and show as `Place (id)`.)
+Results appear as **purple dots** — tap one to open the add-stop popup (name pre-filled), or **Clear** to remove them. Primary endpoint `overpass-api.de`, falling back to `overpass.kumi.systems` on timeout. (Metro dots are named stations; Accommodation searches `tourism=hotel` and includes both point- and building-mapped hotels.)
 
 ---
 
