@@ -14,7 +14,7 @@ A browser app for planning and exporting walking routes in Paris (and anywhere e
 - **On an iPad:** open the live URL in Safari, then **Share → Add to Home Screen** to launch it full-screen like an app (see [PWA](#install-on-ipad-pwa)).
 - **Local development:** serve the `v3/` folder with any static file server and open it — for example:
   ```bash
-  cd ".../Map Generator/maperati/v3"
+  cd maperati/v3
   python3 -m http.server 8000     # then open http://localhost:8000/
   ```
   No Python app, Flask, or build step is involved — the server only needs to serve static files.

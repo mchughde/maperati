@@ -7,7 +7,7 @@ A local browser app for planning and exporting walking routes in Paris (and anyw
 ## Quick start
 
 ```bash
-cd "/Users/diannemchugh/Library/CloudStorage/GoogleDrive-mchughde@gmail.com/My Drive/Map Generator/maperati"
+cd /path/to/maperati
 python3 app.py
 ```
 
