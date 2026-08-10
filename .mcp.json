@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "maperati": {
-      "command": "node",
-      "args": ["mcp/server.js"]
-    }
-  }
-}
