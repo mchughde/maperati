@@ -1,0 +1,18 @@
+{
+  "name": "maperati-mcp",
+  "version": "1.0.0",
+  "description": "Local MCP server for generating and reading Maperati v3 session files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  }
+}

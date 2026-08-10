@@ -46,3 +46,9 @@ Paris Parks/
 
 # Claude Code project context — local only
 CLAUDE.md
+
+# MCP server — generated walk files and dependencies stay local.
+# Generated sessions/exports can contain home addresses and travel plans; not for a public repo.
+mcp/node_modules/
+mcp/workspace/*
+!mcp/workspace/.gitkeep
