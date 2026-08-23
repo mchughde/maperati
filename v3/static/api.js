@@ -1,7 +1,15 @@
 // ═══ Direct API helpers — v3 calls ORS and OSRM without a Flask backend ══════
 
 function orsKey() { return localStorage.getItem('maperati_ors_key') || ''; }
-const ORS_BASE         = 'https://api.openrouteservice.org/v2';
+// HeiGIT is retiring api.openrouteservice.org. As at 23 August 2026 the split is
+// uneven, so the two different hosts below are deliberate:
+//   directions  - REFUSED on the old host with a misleading 403 "Quota exceeded"
+//                 even on a full quota; works on the new one. This is what makes
+//                 routing fall back to OSRM, which serves car routes labelled as
+//                 walking (the public OSRM has only the car profile loaded).
+//   snap/matrix - work on both.
+//   elevation   - works ONLY on the old host; no path on the new one yet.
+const ORS_BASE         = 'https://api.heigit.org/openrouteservice/v2';
 const ORS_ELEVATION_URL = 'https://api.openrouteservice.org/elevation/line';
 const OSRM_URL         = 'https://router.project-osrm.org';
 

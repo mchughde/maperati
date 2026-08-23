@@ -28,7 +28,16 @@ OSRM_URL     = "http://router.project-osrm.org"
 OSRM_PROFILE = "foot"
 
 ORS_API_KEY  = os.environ.get("ORS_API_KEY", "")
-ORS_BASE          = "https://api.openrouteservice.org/v2"
+# HeiGIT is retiring api.openrouteservice.org. As at 23 August 2026 the split is
+# uneven, so this is deliberately two different hosts, not an oversight:
+#   directions  - REFUSED on the old host with a misleading 403 "Quota exceeded"
+#                 even on a full quota; works on the new one. This is what makes
+#                 routing fall back to OSRM, which serves car routes labelled as
+#                 walking (the public OSRM has only the car profile loaded).
+#   snap/matrix - work on both.
+#   elevation   - works ONLY on the old host; it has no path on the new one yet.
+# Move the elevation URL across once HeiGIT publishes its new home.
+ORS_BASE          = "https://api.heigit.org/openrouteservice/v2"
 ORS_ELEVATION_URL = "https://api.openrouteservice.org/elevation/line"
 
 # ── Debug helper ──────────────────────────────────────────────────────────────
