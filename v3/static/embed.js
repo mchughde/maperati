@@ -34,8 +34,11 @@
     center: [2.3488, 48.8534],
     zoom: 13,
     interactive,
-    attributionControl: true,
+    attributionControl: false,   // replaced by MapCredit (styles-config.js)
   });
+  const mapCredit = new MapCredit();
+  map.addControl(mapCredit, 'bottom-right');
+  mapCredit.show(styleId);
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
 
   map.on('load', () => {

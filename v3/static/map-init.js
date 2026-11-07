@@ -8,12 +8,17 @@ const map = new maplibregl.Map({
   center: [2.3488, 48.8534],
   zoom: 13,
   preserveDrawingBuffer: true,  // needed for canvas-based image export
+  attributionControl: false,    // replaced by MapCredit (styles-config.js)
   clickTolerance: 15,           // default 3px is too tight for Apple Pencil contact drift
 });
 
 // Set up GeoJSON data layers as soon as the initial style has loaded.
 // Use once() so this doesn't re-fire if MapLibre emits 'load' again on setStyle().
 map.once('load', setupMapDataLayers);
+
+const mapCredit = new MapCredit();
+map.addControl(mapCredit, 'bottom-right');
+mapCredit.show(currentStyleId);
 
 // Custom zoom control with 0.25 step (matches v1 Leaflet zoomDelta)
 class ZoomControl {
@@ -120,6 +125,7 @@ const _CUSTOM_LAYERS  = ['route-line','route-preview-dot','erase-marker-dot','bb
 
 function switchMapStyle(styleId) {
   currentStyleId = styleId;
+  mapCredit.show(styleId);
   const style = MAP_STYLES.find(s => s.id === styleId);
   document.getElementById('bm-label').textContent = style.label;
   document.querySelectorAll('.bm-dot').forEach((dot, i) => {
